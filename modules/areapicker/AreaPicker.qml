@@ -16,7 +16,7 @@ Scope {
         property bool clipboardOnly
 
         Variants {
-            model: Screens.screens
+            model: Quickshell.screens
 
             StyledWindow {
                 id: win
