@@ -12,6 +12,10 @@ Scope {
     required property ShellScreen screen
     required property Bar.BarWrapper bar
 
+    // NaxeCode fork: gate exclusion-zone visibility on per-screen `enabled` so the
+    // 1px edge surfaces stop emitting on OLED-blackout screens.
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(root.screen.name).enabled
+
     ExclusionZone {
         anchors.left: true
         exclusiveZone: root.bar.exclusiveZone
@@ -36,5 +40,6 @@ Scope {
         mask: Region {}
         implicitWidth: 1
         implicitHeight: 1
+        visible: !root.oledBlackout
     }
 }

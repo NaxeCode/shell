@@ -31,10 +31,14 @@ StyledWindow {
         }
         return monitor?.activeWorkspace?.toplevels.values.some(t => t.lastIpcObject.fullscreen > 1) ?? false;
     }
-    property real borderThickness: hasFullscreen ? 0 : contentItem.Config.border.thickness
-    readonly property real borderLayoutThickness: hasFullscreen ? 0 : contentItem.Config.border.thickness
-    property real borderRounding: hasFullscreen ? 0 : contentItem.Config.border.rounding
-    property real shadowOpacity: hasFullscreen ? 0 : 0.7
+    // NaxeCode fork: per-monitor `enabled:false` repurposed as "OLED blackout" — keep
+    // the drawers window instantiated (so drawers render here on demand) but suppress
+    // every persistent paint surface (border, shadow, scrim).
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
+    property real borderThickness: (hasFullscreen || oledBlackout) ? 0 : contentItem.Config.border.thickness
+    readonly property real borderLayoutThickness: (hasFullscreen || oledBlackout) ? 0 : contentItem.Config.border.thickness
+    property real borderRounding: (hasFullscreen || oledBlackout) ? 0 : contentItem.Config.border.rounding
+    property real shadowOpacity: (hasFullscreen || oledBlackout) ? 0 : 0.7
 
     readonly property int dragMaskPadding: {
         if (focusGrab.active || panels.popouts.isDetached)
@@ -141,6 +145,9 @@ StyledWindow {
             anchors.margins: -50 // Make border thicker to smooth out bulge from closed drawers
             group: blobGroup
             radius: root.borderRounding
+            // NaxeCode fork: kill the persistent border outline on OLED-blackout screens
+            // (subpixel anti-aliasing leaves a thin outline even when borderThickness=0).
+            visible: !root.oledBlackout
             borderLeft: bar.implicitWidth - anchors.margins
             borderRight: root.borderThickness - anchors.margins
             borderTop: root.borderThickness - anchors.margins

@@ -38,7 +38,9 @@ Item {
 
     clip: true
     visible: width > 0
-    implicitWidth: fullscreen ? 0 : Config.border.thickness
+    // NaxeCode fork: zero-width when bar excluded so the wrapper doesn't reserve a
+    // border-thickness column (which leaks a left-edge stripe on OLED-blackout screens).
+    implicitWidth: (fullscreen || disabled) ? 0 : Config.border.thickness
 
     states: State {
         name: "visible"
