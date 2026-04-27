@@ -49,6 +49,13 @@ Item {
                 iconName: "cloud",
                 text: qsTr("Weather"),
                 enabled: Config.dashboard.showWeather
+            },
+            // NaxeCode fork: System tab — pp-* / mon-* control + telemetry from pp-data.
+            {
+                component: systemComponent,
+                iconName: "tune",
+                text: qsTr("System"),
+                enabled: true
             }
         ];
         return allTabs.filter(tab => tab.enabled);
@@ -189,6 +196,13 @@ Item {
                 id: weatherComponent
 
                 WeatherTab {}
+            }
+
+            // NaxeCode fork
+            Component {
+                id: systemComponent
+
+                SystemTab {}
             }
 
             Behavior on contentX {
