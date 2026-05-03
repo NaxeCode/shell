@@ -39,6 +39,13 @@ Item {
         layers: 0.4
     })
 
+    readonly property var ghosttyDefaults: ({
+        opacity: 0.85,
+        blur: false
+    })
+
+    readonly property string ghosttyPath: `${Paths.home}/.config/ghostty/config`
+
     // ── HyprGlass mutable state ──
     property bool hgEnabled: hgDefaults.enabled
     property real hgBlurStrength: hgDefaults.blur_strength
@@ -51,6 +58,9 @@ Item {
     property real hgLensDistortion: hgDefaults.lens_distortion
     property real hgVibrancy: hgDefaults.vibrancy
     property real hgVibrancyDarkness: hgDefaults.vibrancy_darkness
+
+    property real ghosttyOpacity: ghosttyDefaults.opacity
+    property bool ghosttyBlur: ghosttyDefaults.blur
 
     property bool _loaded: false
 
@@ -116,6 +126,20 @@ Item {
         saveDebounce.restart();
     }
 
+    function loadGhosttyConfig(text: string): void {
+        const opMatch = text.match(/^background-opacity\s*=\s*([\d.]+)/m);
+        if (opMatch) ghosttyOpacity = parseFloat(opMatch[1]);
+        const blurMatch = text.match(/^background-blur\s*=\s*(\w+)/m);
+        if (blurMatch) ghosttyBlur = blurMatch[1] === "true";
+    }
+
+    function saveGhostty(): void {
+        Quickshell.execDetached(["sed", "-i",
+            "-e", `s/^background-opacity = .*/background-opacity = ${ghosttyOpacity}/`,
+            "-e", `s/^background-blur = .*/background-blur = ${ghosttyBlur}/`,
+            ghosttyPath]);
+    }
+
     function loadFromJson(text: string): void {
         try {
             const data = JSON.parse(text);
@@ -154,8 +178,12 @@ Item {
         GlobalConfig.appearance.transparency.base = trDefaults.base;
         GlobalConfig.appearance.transparency.layers = trDefaults.layers;
 
+        ghosttyOpacity = ghosttyDefaults.opacity;
+        ghosttyBlur = ghosttyDefaults.blur;
+
         save();
         applyAllHg();
+        saveGhostty();
     }
 
     FileView {
@@ -178,11 +206,26 @@ Item {
         printErrors: false
     }
 
+    FileView {
+        id: ghosttyFile
+
+        path: root.ghosttyPath
+        printErrors: false
+        onLoaded: root.loadGhosttyConfig(text())
+    }
+
     Timer {
         id: saveDebounce
 
         interval: 200
         onTriggered: root.save()
+    }
+
+    Timer {
+        id: ghosttyDebounce
+
+        interval: 200
+        onTriggered: root.saveGhostty()
     }
 
     StyledFlickable {
@@ -434,6 +477,55 @@ Item {
                             onValueModified: v => {
                                 root.hgVibrancyDarkness = v;
                                 root.hgChange("vibrancy_darkness", v);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Ghostty ──────────────────────────────────────────────────────
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Tokens.spacing.small
+
+                StyledText {
+                    text: qsTr("Ghostty")
+                    font.pointSize: Tokens.font.size.normal
+                    color: Colours.palette.m3onSurfaceVariant
+                }
+
+                StyledRect {
+                    Layout.fillWidth: true
+                    implicitHeight: ghosttyCol.implicitHeight + Tokens.padding.normal * 2
+                    radius: Tokens.rounding.normal
+                    color: Colours.tPalette.m3surfaceContainer
+
+                    ColumnLayout {
+                        id: ghosttyCol
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: Tokens.padding.normal
+                        spacing: Tokens.spacing.normal
+
+                        EffectSlider {
+                            label: qsTr("Background opacity")
+                            value: root.ghosttyOpacity * 100
+                            from: 0; to: 100; stepSize: 1; decimals: 0
+                            suffix: "%"
+                            onValueModified: v => {
+                                root.ghosttyOpacity = v / 100;
+                                ghosttyDebounce.restart();
+                            }
+                        }
+
+                        SwitchRow {
+                            label: qsTr("Background blur")
+                            checked: root.ghosttyBlur
+                            onToggled: checked => {
+                                root.ghosttyBlur = checked;
+                                root.saveGhostty();
                             }
                         }
                     }
