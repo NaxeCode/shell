@@ -64,8 +64,14 @@ Item {
         const obj = monitor?.lastIpcObject;
         if (!obj) return;
         const args = ["mon-set", monitor.name];
-        if (opts?.rate !== undefined)
+        if (opts?.rate !== undefined) {
             args.push(`mode=${obj.width}x${obj.height}@${opts.rate}`);
+            // Sync monitor-restore state file so the rate survives reboot.
+            // monitor-restore reads ~/.local/state/monitor-aw-hz at boot and
+            // overrides the monitorv2 block via hyprctl keyword monitor.
+            if (monitor.name === "DP-2")
+                Quickshell.execDetached(["sh", "-c", `printf '%s\\n' '${opts.rate}' > ~/.local/state/monitor-aw-hz`]);
+        }
         if (opts?.vrr !== undefined)
             args.push(`vrr=${opts.vrr ? 1 : 0}`);
         if (opts?.cm !== undefined)
@@ -74,12 +80,29 @@ Item {
             Quickshell.execDetached(args);
     }
 
+    function resetToDefaults(): void {
+        SysControl.setProfile("normal");
+        SysControl.setMonitorMode("desk");
+    }
+
     ColumnLayout {
         id: layout
 
         anchors.fill: parent
         anchors.margins: Tokens.padding.large
         spacing: Tokens.spacing.larger
+
+        // ── Header ─────────────────────────────────────────────────────────────
+        RowLayout {
+            Layout.fillWidth: true
+            Item { Layout.fillWidth: true }
+            IconTextButton {
+                icon: "restart_alt"
+                text: qsTr("Default")
+                type: IconTextButton.Tonal
+                onClicked: root.resetToDefaults()
+            }
+        }
 
         // ── Power profile ─────────────────────────────────────────────────────
         ColumnLayout {
@@ -254,7 +277,7 @@ Item {
                                         checked: Math.round(tile.hz) === modelData
                                         type: IconTextButton.Tonal
                                         font.pointSize: Tokens.font.size.smaller
-                                        verticalPadding: Tokens.padding.smallest
+                                        verticalPadding: Tokens.padding.small
                                         onClicked: root.monApply(tile.modelData, { rate: modelData })
                                     }
                                 }
@@ -274,7 +297,7 @@ Item {
                                     checked: tile.vrrOn
                                     type: IconTextButton.Tonal
                                     font.pointSize: Tokens.font.size.smaller
-                                    verticalPadding: Tokens.padding.smallest
+                                    verticalPadding: Tokens.padding.small
                                     onClicked: root.monApply(tile.modelData, { vrr: !tile.vrrOn })
                                 }
 
@@ -286,7 +309,7 @@ Item {
                                     checked: tile.hdrOn
                                     type: IconTextButton.Tonal
                                     font.pointSize: Tokens.font.size.smaller
-                                    verticalPadding: Tokens.padding.smallest
+                                    verticalPadding: Tokens.padding.small
                                     onClicked: root.monApply(tile.modelData, { cm: tile.hdrOn ? "srgb" : "hdredid" })
                                 }
                             }

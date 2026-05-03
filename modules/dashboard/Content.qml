@@ -56,6 +56,13 @@ Item {
                 iconName: "tune",
                 text: qsTr("System"),
                 enabled: true
+            },
+            // NaxeCode fork: Effects tab — transparency + HyprGlass tuning.
+            {
+                component: effectsComponent,
+                iconName: "auto_awesome",
+                text: qsTr("Effects"),
+                enabled: true
             }
         ];
         return allTabs.filter(tab => tab.enabled);
@@ -203,6 +210,13 @@ Item {
                 id: systemComponent
 
                 SystemTab {}
+            }
+
+            // NaxeCode fork
+            Component {
+                id: effectsComponent
+
+                EffectsTab {}
             }
 
             Behavior on contentX {
