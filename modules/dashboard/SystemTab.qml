@@ -82,6 +82,11 @@ Item {
 
     function resetToDefaults(): void {
         SysControl.setProfile("normal");
+        // Edit monitorv2 blocks directly — hyprctl keyword monitor is silently
+        // ignored on 0.54.3 for outputs with monitorv2 blocks.
+        Quickshell.execDetached(["mon-set", "DP-1", "mode=3840x2160@60", "vrr=0", "cm=srgb"]);
+        Quickshell.execDetached(["mon-set", "DP-2", "mode=3840x2160@120", "vrr=1", "cm=srgb"]);
+        Quickshell.execDetached(["sh", "-c", "printf '%s\\n' '120' > ~/.local/state/monitor-aw-hz"]);
         SysControl.setMonitorMode("desk");
     }
 
