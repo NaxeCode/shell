@@ -161,7 +161,6 @@ Item {
             console.warn("EffectsTab: JSON parse failed, using defaults");
         }
         _loaded = true;
-        applyAllHg();
     }
 
     function resetToDefaults(): void {
@@ -198,7 +197,6 @@ Item {
         onLoadFailed: {
             root._loaded = true;
             root.save();
-            root.applyAllHg();
         }
     }
 
