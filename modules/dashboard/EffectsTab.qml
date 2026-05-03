@@ -134,10 +134,13 @@ Item {
     }
 
     function saveGhostty(): void {
-        Quickshell.execDetached(["sed", "-i",
-            "-e", `s/^background-opacity = .*/background-opacity = ${ghosttyOpacity}/`,
-            "-e", `s/^background-blur = .*/background-blur = ${ghosttyBlur}/`,
-            ghosttyPath]);
+        Quickshell.execDetached(["sh", "-c",
+            `sed -i -e 's/^background-opacity = .*/background-opacity = ${ghosttyOpacity}/' ` +
+            `-e 's/^background-blur = .*/background-blur = ${ghosttyBlur}/' ` +
+            `'${ghosttyPath}' && ` +
+            `gdbus call --session --dest com.mitchellh.ghostty ` +
+            `--object-path /com/mitchellh/ghostty ` +
+            `--method org.gtk.Actions.Activate reload-config '[]' '{}'`]);
     }
 
     function loadFromJson(text: string): void {
