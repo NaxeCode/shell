@@ -12,9 +12,8 @@ Scope {
     required property ShellScreen screen
     required property Bar.BarWrapper bar
 
-    // NaxeCode fork: gate exclusion-zone visibility on per-screen `enabled` and
-    // zero-thickness borders so 1px edge surfaces do not emit degenerate layer
-    // geometry on OLED-blackout / no-border screens.
+    // NaxeCode fork: gate exclusion-zone visibility on per-screen `enabled` so the
+    // 1px edge surfaces stop emitting on OLED-blackout screens.
     readonly property bool oledBlackout: !GlobalConfig.forScreen(root.screen.name).enabled
 
     ExclusionZone {
@@ -41,6 +40,6 @@ Scope {
         mask: Region {}
         implicitWidth: 1
         implicitHeight: 1
-        visible: !root.oledBlackout && contentItem.Config.border.thickness > 0
+        visible: !root.oledBlackout
     }
 }
