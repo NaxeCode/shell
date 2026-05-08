@@ -17,6 +17,16 @@ Searcher {
     list: variants.instances
     useFuzzy: GlobalConfig.launcher.useFuzzy.actions
 
+    readonly property list<string> normalLauncherActions: ["Shutdown", "Reboot", "Logout", "Lock", "Sleep"]
+
+    function normalSearch(search: string): list<var> {
+        const query = search.trim().toLowerCase();
+        if (!query)
+            return [];
+
+        return allVariants.instances.filter(a => normalLauncherActions.includes(a.name) && (`${a.name} ${a.desc}`.toLowerCase().includes(query)));
+    }
+
     Variants {
         id: variants
 
@@ -25,8 +35,17 @@ Searcher {
         Action {}
     }
 
+    Variants {
+        id: allVariants
+
+        model: GlobalConfig.launcher.actions.filter(a => a.enabled ?? true)
+
+        Action {}
+    }
+
     component Action: QtObject {
         required property var modelData
+        readonly property string launcherType: "action"
         readonly property string name: modelData.name ?? qsTr("Unnamed")
         readonly property string desc: modelData.description ?? qsTr("No description")
         readonly property string icon: modelData.icon ?? "help_outline"

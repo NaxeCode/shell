@@ -61,6 +61,14 @@ StyledListView {
         return "apps";
     }
 
+    readonly property list<string> systemActionAppNames: ["shut down", "reboot", "log out", "suspend", "lock screen"]
+
+    function normalSearch(search: string): list<var> {
+        const actions = Actions.normalSearch(search);
+        const apps = Apps.search(search).filter(a => !systemActionAppNames.includes((a.name ?? "").toLowerCase()));
+        return [...actions, ...apps];
+    }
+
     onStateChanged: {
         if (state === "scheme" || state === "variant")
             Schemes.reload();
@@ -71,8 +79,8 @@ StyledListView {
             name: "apps"
 
             PropertyChanges {
-                model.values: Apps.search(search.text)
-                root.delegate: appItem
+                model.values: root.normalSearch(search.text)
+                root.delegate: mixedItem
             }
         },
         State {
@@ -215,10 +223,41 @@ StyledListView {
     }
 
     Component {
-        id: appItem
+        id: mixedItem
 
-        AppItem {
-            visibilities: root.visibilities
+        Item {
+            id: mixedDelegate
+
+            required property var modelData
+
+            anchors.left: parent?.left
+            anchors.right: parent?.right
+            implicitHeight: Tokens.sizes.launcher.itemHeight
+
+            Loader {
+                id: itemLoader
+
+                anchors.fill: parent
+                sourceComponent: mixedDelegate.modelData?.launcherType === "action" ? mixedActionItem : mixedAppItem
+            }
+
+            Component {
+                id: mixedAppItem
+
+                AppItem {
+                    modelData: mixedDelegate.modelData
+                    visibilities: root.visibilities
+                }
+            }
+
+            Component {
+                id: mixedActionItem
+
+                ActionItem {
+                    modelData: mixedDelegate.modelData
+                    list: root
+                }
+            }
         }
     }
 
