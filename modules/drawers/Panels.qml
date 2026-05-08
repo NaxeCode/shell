@@ -87,6 +87,7 @@ Item {
         Session.Wrapper {
             id: session
 
+            screen: root.screen
             visibilities: root.visibilities
             sidebarVisible: sidebar.visible
 
@@ -109,6 +110,7 @@ Item {
     Dashboard.Wrapper {
         id: dashboard
 
+        screen: root.screen
         visibilities: root.visibilities
 
         anchors.horizontalCenter: parent.horizontalCenter
@@ -125,6 +127,7 @@ Item {
     Utilities.Wrapper {
         id: utilities
 
+        screen: root.screen
         visibilities: root.visibilities
         sidebar: sidebar
         popouts: popoutsWrapper.content
@@ -144,6 +147,7 @@ Item {
     Sidebar.Wrapper {
         id: sidebar
 
+        screen: root.screen
         visibilities: root.visibilities
 
         anchors.top: notifications.bottom

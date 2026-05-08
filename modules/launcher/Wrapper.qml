@@ -22,7 +22,8 @@ Item {
         return max;
     }
 
-    readonly property real hiddenOverscan: 32
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
+    readonly property real hiddenOverscan: oledBlackout ? 32 : 5
     property real offsetScale: shouldBeActive ? 0 : 1
 
     onShouldBeActiveChanged: {
@@ -32,7 +33,7 @@ Item {
             implicitHeight = implicitHeight; // Break binding during close anim
     }
 
-    visible: shouldBeActive || offsetScale < 0.99
+    visible: oledBlackout ? (shouldBeActive || offsetScale < 0.99) : offsetScale < 1
     anchors.bottomMargin: (-implicitHeight - hiddenOverscan) * offsetScale
     implicitHeight: content.implicitHeight
     implicitWidth: content.implicitWidth || 630 // Hard coded fallback for first open

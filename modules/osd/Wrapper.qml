@@ -16,7 +16,8 @@ Item {
     property bool hovered
     readonly property Brightness.Monitor monitor: Brightness.getMonitorForScreen(root.screen)
     readonly property bool shouldBeActive: visibilities.osd && Config.osd.enabled && !(visibilities.utilities && Config.utilities.enabled)
-    readonly property real hiddenOverscan: 32
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
+    readonly property real hiddenOverscan: oledBlackout ? 32 : 5
     property real offsetScale: shouldBeActive ? 0 : 1
     property real sidebarOffset: sidebarOrSessionVisible ? 12 : 0
 
@@ -39,7 +40,7 @@ Item {
         brightness = root.monitor?.brightness ?? 0;
     }
 
-    visible: shouldBeActive || offsetScale < 0.99
+    visible: oledBlackout ? (shouldBeActive || offsetScale < 0.99) : offsetScale < 1
     anchors.rightMargin: (-implicitWidth - hiddenOverscan - sidebarOffset) * offsetScale
     implicitWidth: content.implicitWidth
     implicitHeight: content.implicitHeight

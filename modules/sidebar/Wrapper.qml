@@ -7,14 +7,16 @@ import qs.components
 Item {
     id: root
 
+    required property var screen
     required property DrawerVisibilities visibilities
     readonly property Props props: Props {}
 
     readonly property bool shouldBeActive: visibilities.sidebar && Config.sidebar.enabled
-    readonly property real hiddenOverscan: 32
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
+    readonly property real hiddenOverscan: oledBlackout ? 32 : 5
     property real offsetScale: shouldBeActive ? 0 : 1
 
-    visible: shouldBeActive || offsetScale < 0.99
+    visible: oledBlackout ? (shouldBeActive || offsetScale < 0.99) : offsetScale < 1
     anchors.rightMargin: (-implicitWidth - hiddenOverscan) * offsetScale
     implicitWidth: Tokens.sizes.sidebar.width
     opacity: 1 - offsetScale

@@ -10,6 +10,7 @@ import qs.modules.bar.popouts as BarPopouts
 Item {
     id: root
 
+    required property var screen
     required property DrawerVisibilities visibilities
     required property Sidebar.Wrapper sidebar
     required property BarPopouts.Wrapper popouts
@@ -24,11 +25,12 @@ Item {
         reloadableId: "utilities"
     }
     readonly property bool shouldBeActive: visibilities.sidebar || (visibilities.utilities && Config.utilities.enabled && !(visibilities.session && Config.session.enabled))
-    readonly property real hiddenOverscan: 32
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
+    readonly property real hiddenOverscan: oledBlackout ? 32 : 5
     property real offsetScale: shouldBeActive ? 0 : 1
     property real sidebarLerp
 
-    visible: shouldBeActive || offsetScale < 0.99
+    visible: oledBlackout ? (shouldBeActive || offsetScale < 0.99) : offsetScale < 1
     anchors.bottomMargin: (-implicitHeight - hiddenOverscan) * offsetScale
     implicitHeight: content.implicitHeight + content.anchors.margins * 2
     implicitWidth: sidebar.width * (1 - sidebar.offsetScale) * horizontalStretch * sidebarLerp + Tokens.sizes.utilities.width * (1 - sidebarLerp)

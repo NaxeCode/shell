@@ -11,6 +11,7 @@ import qs.utils
 Item {
     id: root
 
+    required property var screen
     required property DrawerVisibilities visibilities
     readonly property bool needsKeyboard: (content.item as Content)?.needsKeyboard ?? false
     readonly property DashboardState dashState: DashboardState {
@@ -30,10 +31,11 @@ Item {
 
     readonly property real nonAnimHeight: state === "visible" ? ((content.item as Content)?.nonAnimHeight ?? 0) : 0
     readonly property bool shouldBeActive: visibilities.dashboard && Config.dashboard.enabled
-    readonly property real hiddenOverscan: 32
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
+    readonly property real hiddenOverscan: oledBlackout ? 32 : 5
     property real offsetScale: shouldBeActive ? 0 : 1
 
-    visible: shouldBeActive || offsetScale < 0.99
+    visible: oledBlackout ? (shouldBeActive || offsetScale < 0.99) : offsetScale < 1
     anchors.topMargin: (-implicitHeight - hiddenOverscan) * offsetScale
     implicitHeight: content.implicitHeight
     implicitWidth: content.implicitWidth || 854 // Hard coded fallback for first open

@@ -14,6 +14,7 @@ Region {
 
     readonly property real borderThickness: win.contentItem.Config.border.thickness
     readonly property real clampedThickness: win.contentItem.Config.border.clampedThickness
+    readonly property bool oledBlackout: win.oledBlackout
 
     x: bar.clampedWidth + win.dragMaskPadding
     y: clampedThickness + win.dragMaskPadding
@@ -24,13 +25,13 @@ Region {
     R {
         panel: root.panels.dashboard
         y: 0
-        height: panel.height * (1 - root.panels.dashboard.offsetScale) + root.borderThickness
+        height: panel.height * (1 - root.panels.dashboard.offsetScale) + ((!root.oledBlackout || root.panels.dashboard.offsetScale < 0.99) ? root.borderThickness : 0)
     }
 
     R {
         panel: root.panels.launcher
         y: root.win.height - height
-        height: panel.height * (1 - root.panels.launcher.offsetScale) + root.borderThickness
+        height: panel.height * (1 - root.panels.launcher.offsetScale) + ((!root.oledBlackout || root.panels.launcher.offsetScale < 0.99) ? root.borderThickness : 0)
     }
 
     R {
@@ -38,7 +39,7 @@ Region {
 
         panel: root.panels.sessionWrapper
         x: root.win.width - width
-        width: panel.width * (1 - root.panels.session.offsetScale) + root.borderThickness + sidebarRegion.width
+        width: panel.width * (1 - root.panels.session.offsetScale) + ((!root.oledBlackout || root.panels.session.offsetScale < 0.99) ? root.borderThickness : 0) + sidebarRegion.width
     }
 
     R {
@@ -46,13 +47,13 @@ Region {
 
         panel: root.panels.sidebar
         x: root.win.width - width
-        width: panel.width * (1 - root.panels.sidebar.offsetScale) + root.borderThickness
+        width: panel.width * (1 - root.panels.sidebar.offsetScale) + ((!root.oledBlackout || root.panels.sidebar.offsetScale < 0.99) ? root.borderThickness : 0)
     }
 
     R {
         panel: root.panels.osdWrapper
         x: root.win.width - width
-        width: panel.width * (1 - root.panels.osd.offsetScale) + root.borderThickness + sessionRegion.width
+        width: panel.width * (1 - root.panels.osd.offsetScale) + ((!root.oledBlackout || root.panels.osd.offsetScale < 0.99) ? root.borderThickness : 0) + sessionRegion.width
     }
 
     R {
@@ -64,7 +65,7 @@ Region {
     R {
         panel: root.panels.utilities
         y: root.win.height - height
-        height: panel.height * (1 - root.panels.utilities.offsetScale) + root.borderThickness
+        height: panel.height * (1 - root.panels.utilities.offsetScale) + ((!root.oledBlackout || root.panels.utilities.offsetScale < 0.99) ? root.borderThickness : 0)
     }
 
     R {
