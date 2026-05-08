@@ -11,10 +11,11 @@ Item {
     readonly property Props props: Props {}
 
     readonly property bool shouldBeActive: visibilities.sidebar && Config.sidebar.enabled
+    readonly property real hiddenOverscan: 32
     property real offsetScale: shouldBeActive ? 0 : 1
 
-    visible: offsetScale < 1
-    anchors.rightMargin: (-implicitWidth - 5) * offsetScale
+    visible: shouldBeActive || offsetScale < 0.99
+    anchors.rightMargin: (-implicitWidth - hiddenOverscan) * offsetScale
     implicitWidth: Tokens.sizes.sidebar.width
     opacity: 1 - offsetScale
 

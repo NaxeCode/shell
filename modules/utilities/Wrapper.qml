@@ -24,11 +24,12 @@ Item {
         reloadableId: "utilities"
     }
     readonly property bool shouldBeActive: visibilities.sidebar || (visibilities.utilities && Config.utilities.enabled && !(visibilities.session && Config.session.enabled))
+    readonly property real hiddenOverscan: 32
     property real offsetScale: shouldBeActive ? 0 : 1
     property real sidebarLerp
 
-    visible: offsetScale < 1
-    anchors.bottomMargin: (-implicitHeight - 5) * offsetScale
+    visible: shouldBeActive || offsetScale < 0.99
+    anchors.bottomMargin: (-implicitHeight - hiddenOverscan) * offsetScale
     implicitHeight: content.implicitHeight + content.anchors.margins * 2
     implicitWidth: sidebar.width * (1 - sidebar.offsetScale) * horizontalStretch * sidebarLerp + Tokens.sizes.utilities.width * (1 - sidebarLerp)
     opacity: 1 - offsetScale

@@ -39,6 +39,7 @@ StyledWindow {
     readonly property real borderLayoutThickness: (hasFullscreen || oledBlackout) ? 0 : contentItem.Config.border.thickness
     property real borderRounding: (hasFullscreen || oledBlackout) ? 0 : contentItem.Config.border.rounding
     property real shadowOpacity: (hasFullscreen || oledBlackout) ? 0 : 0.7
+    readonly property bool hasVisibleDrawerPaint: panels.dashboard.visible || panels.launcher.visible || panels.session.visible || panels.sidebar.visible || panels.osd.visible || panels.utilities.visible
 
     readonly property int dragMaskPadding: {
         if (focusGrab.active || panels.popouts.isDetached)
@@ -121,6 +122,7 @@ StyledWindow {
 
     Item {
         anchors.fill: parent
+        visible: !root.oledBlackout || root.hasVisibleDrawerPaint
         opacity: Colours.transparency.enabled ? Colours.transparency.base : 1
         layer.enabled: true
         layer.effect: MultiEffect {

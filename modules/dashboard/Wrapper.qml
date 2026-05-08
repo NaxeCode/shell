@@ -30,10 +30,11 @@ Item {
 
     readonly property real nonAnimHeight: state === "visible" ? ((content.item as Content)?.nonAnimHeight ?? 0) : 0
     readonly property bool shouldBeActive: visibilities.dashboard && Config.dashboard.enabled
+    readonly property real hiddenOverscan: 32
     property real offsetScale: shouldBeActive ? 0 : 1
 
-    visible: offsetScale < 1
-    anchors.topMargin: (-implicitHeight - 5) * offsetScale
+    visible: shouldBeActive || offsetScale < 0.99
+    anchors.topMargin: (-implicitHeight - hiddenOverscan) * offsetScale
     implicitHeight: content.implicitHeight
     implicitWidth: content.implicitWidth || 854 // Hard coded fallback for first open
     opacity: 1 - offsetScale

@@ -22,6 +22,7 @@ Item {
         return max;
     }
 
+    readonly property real hiddenOverscan: 32
     property real offsetScale: shouldBeActive ? 0 : 1
 
     onShouldBeActiveChanged: {
@@ -31,8 +32,8 @@ Item {
             implicitHeight = implicitHeight; // Break binding during close anim
     }
 
-    visible: offsetScale < 1
-    anchors.bottomMargin: (-implicitHeight - 5) * offsetScale
+    visible: shouldBeActive || offsetScale < 0.99
+    anchors.bottomMargin: (-implicitHeight - hiddenOverscan) * offsetScale
     implicitHeight: content.implicitHeight
     implicitWidth: content.implicitWidth || 630 // Hard coded fallback for first open
     opacity: 1 - offsetScale
