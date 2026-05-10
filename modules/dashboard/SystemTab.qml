@@ -12,7 +12,7 @@ import qs.services
 Item {
     id: root
 
-    readonly property int minWidth: 600
+    readonly property int minWidth: 720
     implicitWidth: Math.max(minWidth, layout.implicitWidth + Tokens.padding.large * 2)
     implicitHeight: layout.implicitHeight + Tokens.padding.large * 2
 
@@ -107,11 +107,19 @@ Item {
 
         anchors.fill: parent
         anchors.margins: Tokens.padding.large
-        spacing: Tokens.spacing.larger
+        spacing: Tokens.spacing.large
 
         // ── Header ─────────────────────────────────────────────────────────────
         RowLayout {
             Layout.fillWidth: true
+            spacing: Tokens.spacing.small
+
+            StyledText {
+                text: qsTr("System")
+                font.pointSize: Tokens.font.size.large
+                color: Colours.palette.m3onSurface
+            }
+
             Item { Layout.fillWidth: true }
             IconTextButton {
                 icon: "auto_awesome"
@@ -139,9 +147,11 @@ Item {
                 color: Colours.palette.m3onSurfaceVariant
             }
 
-            RowLayout {
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: Tokens.spacing.small
+                columns: 3
+                rowSpacing: Tokens.spacing.small
+                columnSpacing: Tokens.spacing.small
 
                 Repeater {
                     model: [
@@ -153,10 +163,12 @@ Item {
                     delegate: IconTextButton {
                         required property var modelData
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 150
                         icon: modelData.icon
                         text: modelData.label
                         checked: SysControl.profileActive === modelData.id
                         type: IconTextButton.Filled
+                        horizontalPadding: Tokens.padding.large
                         onClicked: SysControl.setProfile(modelData.id)
                     }
                 }
@@ -185,9 +197,11 @@ Item {
                 color: Colours.palette.m3onSurfaceVariant
             }
 
-            RowLayout {
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: Tokens.spacing.small
+                columns: 2
+                rowSpacing: Tokens.spacing.small
+                columnSpacing: Tokens.spacing.small
 
                 Repeater {
                     model: [
@@ -200,10 +214,12 @@ Item {
                     delegate: IconTextButton {
                         required property var modelData
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 180
                         icon: modelData.icon
                         text: modelData.label
                         checked: SysControl.monitorMode === modelData.id
                         type: IconTextButton.Filled
+                        horizontalPadding: Tokens.padding.large
                         onClicked: SysControl.setMonitorMode(modelData.id)
                     }
                 }
@@ -221,9 +237,11 @@ Item {
                 color: Colours.palette.m3onSurfaceVariant
             }
 
-            RowLayout {
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: Tokens.spacing.small
+                columns: 1
+                rowSpacing: Tokens.spacing.small
+                columnSpacing: Tokens.spacing.small
 
                 Repeater {
                     model: Hypr.monitors
