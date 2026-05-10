@@ -34,12 +34,13 @@ Singleton {
     // Govee room sensor; null if listener hasn't broadcast yet
     readonly property var room: state.room
 
-    // Per-monitor conf state parsed from ~/.config/hypr/hyprland.conf.
+    // Per-monitor conf state parsed from generated ~/.config/hypr/monitor-layout.conf.
     // Keyed by output name. Each value: { vrr, cm, mode, bitdepth, ... }.
     // Hyprctl's `lastIpcObject.vrr` only reports VRR ENGAGEMENT (bool), so
     // for `vrr=2` (fullscreen-only) it shows false at idle even though VRR
     // is configured on. Conf values are the truth for "is VRR enabled?".
     readonly property var monitorConf: state.monitorConf
+    readonly property bool autoHdr: state.autoHdr
 
     readonly property bool ready: state.ready
 
@@ -55,6 +56,13 @@ Singleton {
         if (!cmd)
             return;
         Quickshell.execDetached(["sh", "-c", `~/.local/bin/${cmd}`]);
+    }
+
+    function setAutoHdr(enabled: bool): void {
+        state.autoHdr = enabled;
+        const cmd = `${Quickshell.env("HOME")}/.local/bin/hypr-auto-hdr ${enabled ? "on" : "off"} >> ${Quickshell.env("HOME")}/.local/state/hypr-auto-hdr.log 2>&1`;
+        console.warn("SysControl auto HDR:", cmd);
+        Quickshell.execDetached(["sh", "-lc", cmd]);
     }
 
     QtObject {
@@ -76,6 +84,12 @@ Singleton {
         property var room: null
         property bool ready: false
         property var monitorConf: ({})
+        property bool autoHdr: false
+    }
+
+    function _parseAutoHdr(text: string): bool {
+        const match = text.match(/^\s*cm_auto_hdr\s*=\s*(\d+)/m);
+        return match ? Number(match[1]) !== 0 : false;
     }
 
     function _parseHyprConf(text: string): var {
@@ -110,10 +124,17 @@ Singleton {
     }
 
     FileView {
-        path: Quickshell.env("HOME") + "/.config/hypr/hyprland.conf"
+        path: Quickshell.env("HOME") + "/.config/hypr/monitor-layout.conf"
         watchChanges: true
         onFileChanged: reload()
         onLoaded: state.monitorConf = root._parseHyprConf(text())
+    }
+
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hypr/hyprland.conf"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: state.autoHdr = root._parseAutoHdr(text())
     }
 
     Process {

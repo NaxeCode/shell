@@ -7,6 +7,7 @@ import "modules/drawers"
 import "modules/background"
 import "modules/areapicker"
 import "modules/lock"
+import "modules/monitorhz"
 import Quickshell
 
 ShellRoot {
@@ -14,6 +15,7 @@ ShellRoot {
 
     Background {}
     Drawers {}
+    LiveHzOverlay {}
     AreaPicker {}
     Lock {
         id: lock
