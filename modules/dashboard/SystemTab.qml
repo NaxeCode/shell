@@ -12,7 +12,7 @@ import qs.services
 Item {
     id: root
 
-    readonly property int minWidth: 720
+    readonly property int minWidth: 640
     implicitWidth: Math.max(minWidth, layout.implicitWidth + Tokens.padding.large * 2)
     implicitHeight: layout.implicitHeight + Tokens.padding.large * 2
 
@@ -45,7 +45,15 @@ Item {
             seen.add(key);
             rates.push(r);
         }
-        return rates.sort((a, b) => a - b);
+        const sorted = rates.sort((a, b) => a - b);
+        // Hide NTSC/video-rate aliases when the same resolution also exposes the
+        // exact PC timing. Example: Cintiq offers 59.94 and 60.00; keep 60.00.
+        // If exact 60 is absent (Dell/AW 1440p expose 59.95), keep fractional.
+        return sorted.filter(r => {
+            const rounded = Math.round(r);
+            const hasExactPeer = sorted.some(o => Math.abs(o - rounded) < 0.01 && Math.abs(o - r) < 0.2);
+            return Math.abs(r - rounded) < 0.01 || !hasExactPeer;
+        });
     }
 
     // Hyprland doesn't surface VRR capability directly in Quickshell. DRM says
@@ -147,11 +155,9 @@ Item {
                 color: Colours.palette.m3onSurfaceVariant
             }
 
-            GridLayout {
+            Flow {
                 Layout.fillWidth: true
-                columns: 3
-                rowSpacing: Tokens.spacing.small
-                columnSpacing: Tokens.spacing.small
+                spacing: Tokens.spacing.small
 
                 Repeater {
                     model: [
@@ -162,13 +168,11 @@ Item {
 
                     delegate: IconTextButton {
                         required property var modelData
-                        Layout.fillWidth: true
-                        Layout.minimumWidth: 150
                         icon: modelData.icon
                         text: modelData.label
                         checked: SysControl.profileActive === modelData.id
                         type: IconTextButton.Filled
-                        horizontalPadding: Tokens.padding.large
+                        horizontalPadding: Tokens.padding.normal
                         onClicked: SysControl.setProfile(modelData.id)
                     }
                 }
@@ -197,11 +201,9 @@ Item {
                 color: Colours.palette.m3onSurfaceVariant
             }
 
-            GridLayout {
+            Flow {
                 Layout.fillWidth: true
-                columns: 2
-                rowSpacing: Tokens.spacing.small
-                columnSpacing: Tokens.spacing.small
+                spacing: Tokens.spacing.small
 
                 Repeater {
                     model: [
@@ -213,13 +215,11 @@ Item {
 
                     delegate: IconTextButton {
                         required property var modelData
-                        Layout.fillWidth: true
-                        Layout.minimumWidth: 180
                         icon: modelData.icon
                         text: modelData.label
                         checked: SysControl.monitorMode === modelData.id
                         type: IconTextButton.Filled
-                        horizontalPadding: Tokens.padding.large
+                        horizontalPadding: Tokens.padding.normal
                         onClicked: SysControl.setMonitorMode(modelData.id)
                     }
                 }

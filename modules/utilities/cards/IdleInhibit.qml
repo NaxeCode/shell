@@ -61,6 +61,40 @@ StyledRect {
             }
         }
 
+        SplitButton {
+            visible: IdleInhibitor.enabled
+            type: SplitButton.Tonal
+            fallbackIcon: "timer"
+            fallbackText: IdleInhibitor.durationLabel
+            menuItems: [
+                MenuItem {
+                    text: qsTr("Indefinite")
+                    icon: "all_inclusive"
+                    onClicked: IdleInhibitor.setDuration(0)
+                },
+                MenuItem {
+                    text: qsTr("30 min")
+                    icon: "timer"
+                    onClicked: IdleInhibitor.setDuration(30)
+                },
+                MenuItem {
+                    text: qsTr("1 hour")
+                    icon: "timer"
+                    onClicked: IdleInhibitor.setDuration(60)
+                },
+                MenuItem {
+                    text: qsTr("2 hours")
+                    icon: "timer"
+                    onClicked: IdleInhibitor.setDuration(120)
+                },
+                MenuItem {
+                    text: qsTr("4 hours")
+                    icon: "timer"
+                    onClicked: IdleInhibitor.setDuration(240)
+                }
+            ]
+        }
+
         StyledSwitch {
             checked: IdleInhibitor.enabled
             onToggled: IdleInhibitor.enabled = checked
@@ -93,7 +127,9 @@ StyledRect {
                 id: activeText
 
                 anchors.centerIn: parent
-                text: qsTr("Active since %1").arg(Qt.formatTime(IdleInhibitor.enabledSince, GlobalConfig.services.useTwelveHourClock ? "hh:mm a" : "hh:mm"))
+                text: IdleInhibitor.remainingSeconds > 0
+                    ? qsTr("%1 min remaining").arg(Math.ceil(IdleInhibitor.remainingSeconds / 60))
+                    : qsTr("Active since %1").arg(Qt.formatTime(IdleInhibitor.enabledSince, GlobalConfig.services.useTwelveHourClock ? "hh:mm a" : "hh:mm"))
                 color: Colours.palette.m3onPrimary
                 font.pointSize: Math.round(Tokens.font.size.small * 0.9)
             }
