@@ -56,15 +56,12 @@ Item {
         });
     }
 
-    // Hyprland doesn't surface VRR capability directly in Quickshell. DRM says
-    // both main panels are vrr_capable=1; keep this description-based so cable
-    // connector swaps don't hide toggles. Fallback: >60Hz modes imply VRR-capable.
+    // Hyprland/DRM do not expose a usable vrr_capable flag through Quickshell.
+    // Keep this allowlist explicit: high fixed refresh (e.g. Dell P2425HE 100 Hz)
+    // is not the same thing as Adaptive-Sync/VRR support.
     function monSupportsVrr(monitor): bool {
         const desc = monitor?.lastIpcObject?.description ?? "";
-        if (desc.includes("DELL S3221QS") || desc.includes("AW3225QF"))
-            return true;
-        const rates = monAvailableRates(monitor);
-        return rates.some(r => r > 60.01);
+        return desc.includes("DELL S3221QS") || desc.includes("AW3225QF");
     }
 
     // Heuristic: panel currently running 10-bit (XRGB2101010) is HDR-capable.
