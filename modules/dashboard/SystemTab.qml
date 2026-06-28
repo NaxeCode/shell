@@ -258,6 +258,9 @@ Item {
                         }
                         readonly property bool hdrCapable: root.monSupportsHdr(modelData)
                         readonly property bool hdrOn: (modelData?.lastIpcObject?.colorManagementPreset ?? "srgb") !== "srgb"
+                        readonly property var brightnessMonitor: Brightness.getMonitor(modelData?.name ?? "")
+                        readonly property real brightnessValue: brightnessMonitor?.brightness ?? 0
+                        readonly property bool brightnessAvailable: brightnessMonitor !== null && brightnessMonitor !== undefined
 
                         Layout.fillWidth: true
                         Layout.preferredHeight: monCol.implicitHeight + Tokens.padding.normal * 2
@@ -298,6 +301,32 @@ Item {
                                     }
                                 }
                                 Item { Layout.fillWidth: true }
+                            }
+
+                            // ── Display brightness ──
+                            RowLayout {
+                                Layout.fillWidth: true
+                                visible: tile.brightnessAvailable
+                                spacing: Tokens.spacing.small
+
+                                MaterialIcon {
+                                    text: `brightness_${Math.max(1, Math.min(7, Math.round(tile.brightnessValue * 6) + 1))}`
+                                    color: Colours.palette.m3onSurfaceVariant
+                                    font.pointSize: Tokens.font.size.normal
+                                }
+
+                                StyledSlider {
+                                    Layout.fillWidth: true
+                                    implicitHeight: Tokens.padding.normal * 3
+                                    value: tile.brightnessValue
+                                    onMoved: tile.brightnessMonitor?.setBrightness(value)
+                                }
+
+                                StyledText {
+                                    text: `${Math.round(tile.brightnessValue * 100)}%`
+                                    color: Colours.palette.m3onSurfaceVariant
+                                    font.pointSize: Tokens.font.size.smaller
+                                }
                             }
 
                             // ── Refresh rate buttons (only if multiple rates) ──

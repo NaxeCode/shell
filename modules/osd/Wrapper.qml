@@ -14,7 +14,7 @@ Item {
     required property bool sidebarOrSessionVisible
 
     property bool hovered
-    readonly property Brightness.Monitor monitor: Brightness.getMonitorForScreen(root.screen)
+    readonly property var monitor: Brightness.getMonitorForScreen(root.screen)
     readonly property bool shouldBeActive: visibilities.osd && Config.osd.enabled && !(visibilities.utilities && Config.utilities.enabled)
     readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
     readonly property real hiddenOverscan: oledBlackout ? 32 : 5

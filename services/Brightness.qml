@@ -21,7 +21,9 @@ Singleton {
     property bool appleDisplayPresent: false
 
     function getMonitorForScreen(screen: ShellScreen): var {
-        return monitors.find(m => m.modelData === screen); // qmllint disable missing-property
+        if (!screen)
+            return null;
+        return monitors.find(m => m.modelData === screen) ?? null; // qmllint disable missing-property
     }
 
     function getMonitor(query: string): var {
