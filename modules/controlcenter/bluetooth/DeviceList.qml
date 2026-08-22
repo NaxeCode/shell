@@ -27,7 +27,7 @@ DeviceList {
     model: ScriptModel {
         id: deviceModel
 
-        values: [...Bluetooth.devices.values].sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name))
+        values: [...Bluetooth.devices.values].sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || Strings.bluetoothDeviceName(a).localeCompare(Strings.bluetoothDeviceName(b)))
     }
 
     headerComponent: Component {
@@ -194,7 +194,7 @@ DeviceList {
 
                     StyledText {
                         Layout.fillWidth: true
-                        text: device.modelData ? device.modelData.name : qsTr("Unknown")
+                        text: Strings.bluetoothDeviceName(device.modelData)
                         elide: Text.ElideRight
                     }
 

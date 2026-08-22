@@ -47,7 +47,7 @@ StyledFlickable {
             headerComponent: Component {
                 SettingsHeader {
                     icon: Icons.getBluetoothIcon(root.device?.icon ?? "")
-                    title: root.device?.name ?? ""
+                    title: Strings.bluetoothDeviceName(root.device)
                 }
             }
 
@@ -198,7 +198,7 @@ StyledFlickable {
                                             anchors.top: renameLabel.bottom
                                             anchors.leftMargin: root.session.bt.editingDeviceName ? 0 : -Tokens.padding.normal
 
-                                            text: root.device?.name ?? ""
+                                            text: root.session.bt.editingDeviceName ? (root.device?.name ?? "") : Strings.bluetoothDeviceName(root.device)
                                             readOnly: !root.session.bt.editingDeviceName
                                             onAccepted: {
                                                 root.session.bt.editingDeviceName = false;
@@ -241,7 +241,7 @@ StyledFlickable {
                                         StateLayer {
                                             onClicked: {
                                                 root.session.bt.editingDeviceName = false;
-                                                deviceNameEdit.text = Qt.binding(() => root.device?.name ?? "");
+                                                deviceNameEdit.text = Qt.binding(() => root.session.bt.editingDeviceName ? (root.device?.name ?? "") : Strings.bluetoothDeviceName(root.device));
                                             }
 
                                             color: Colours.palette.m3onSecondaryContainer

@@ -23,4 +23,24 @@ Singleton {
         }
         return false;
     }
+    function isBluetoothAddressName(name: string, address: string): bool {
+        const compactAddress = address.replace(/[^0-9a-f]/gi, "").toLowerCase();
+        const compactName = name.replace(/[^0-9a-f]/gi, "").toLowerCase();
+        return compactAddress.length === 12 && compactName === compactAddress;
+    }
+
+    function bluetoothDeviceName(device): string {
+        if (!device)
+            return qsTr("Unknown device");
+
+        const address = device.address ?? "";
+        const names = [device.name ?? "", device.deviceName ?? ""];
+        for (const name of names) {
+            const trimmed = name.trim();
+            if (trimmed && !isBluetoothAddressName(trimmed, address))
+                return trimmed;
+        }
+
+        return qsTr("Unknown device");
+    }
 }

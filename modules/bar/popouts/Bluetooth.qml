@@ -62,7 +62,7 @@ ColumnLayout {
 
     Repeater {
         model: ScriptModel {
-            values: [...Bluetooth.devices.values].sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name)).slice(0, 5) // qmllint disable unresolved-type
+            values: [...Bluetooth.devices.values].sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || Strings.bluetoothDeviceName(a).localeCompare(Strings.bluetoothDeviceName(b))).slice(0, 5) // qmllint disable unresolved-type
         }
 
         RowLayout {
@@ -99,7 +99,7 @@ ColumnLayout {
                 Layout.leftMargin: Tokens.spacing.small / 2
                 Layout.rightMargin: Tokens.spacing.small / 2
                 Layout.fillWidth: true
-                text: device.modelData.name
+                text: Strings.bluetoothDeviceName(device.modelData)
                 elide: Text.ElideRight
             }
 
