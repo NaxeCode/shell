@@ -55,7 +55,7 @@ Singleton {
         const cmd = map[mode];
         if (!cmd)
             return;
-        Quickshell.execDetached(["sh", "-c", `~/.local/bin/${cmd}`]);
+        Quickshell.execDetached(["sh", "-c", `flock -n "$XDG_RUNTIME_DIR/caelestia-monitor-mode.lock" ~/.local/bin/${cmd}`]);
     }
 
     function setAutoHdr(enabled: bool): void {

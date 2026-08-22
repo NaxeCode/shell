@@ -30,7 +30,14 @@ Item {
         edge_thickness: 0.08,
         lens_distortion: 0.6,
         vibrancy: 0.15,
-        vibrancy_darkness: 0.0
+        vibrancy_darkness: 0.0,
+        layers_enabled: true
+    })
+
+    readonly property var nativeBlurDefaults: ({
+        enabled: true,
+        size: 8,
+        passes: 2
     })
 
     readonly property var trDefaults: ({
@@ -41,10 +48,17 @@ Item {
 
     readonly property var ghosttyDefaults: ({
         opacity: 0.85,
-        blur: false
+        blur: true
     })
 
     readonly property string ghosttyPath: `${Paths.home}/.config/ghostty/config`
+    readonly property string effectsTool: `${Paths.home}/.local/bin/hypr-effects`
+
+    property string ghosttyPreset: "glass"
+    property bool hgPluginLoaded: false
+    property bool hgHyprpmEnabled: false
+    property string effectsStatus: ""
+    property string effectsConfigErrors: ""
 
     // ── HyprGlass mutable state ──
     property bool hgEnabled: hgDefaults.enabled
@@ -58,6 +72,11 @@ Item {
     property real hgLensDistortion: hgDefaults.lens_distortion
     property real hgVibrancy: hgDefaults.vibrancy
     property real hgVibrancyDarkness: hgDefaults.vibrancy_darkness
+    property bool hgLayersEnabled: hgDefaults.layers_enabled
+
+    property bool nativeBlurEnabled: nativeBlurDefaults.enabled
+    property int nativeBlurSize: nativeBlurDefaults.size
+    property int nativeBlurPasses: nativeBlurDefaults.passes
 
     property real ghosttyOpacity: ghosttyDefaults.opacity
     property bool ghosttyBlur: ghosttyDefaults.blur
@@ -66,6 +85,29 @@ Item {
 
     function applyHg(key: string, value): void {
         Hypr.extras.batchMessage([`keyword plugin:hyprglass:${key} ${value}`]);
+    }
+
+    function applyNativeBlur(key: string, value): void {
+        Hypr.extras.batchMessage([`keyword decoration:blur:${key} ${value}`]);
+    }
+
+    function applyAllNativeBlur(): void {
+        Hypr.extras.batchMessage([
+            `keyword decoration:blur:enabled ${nativeBlurEnabled ? 1 : 0}`,
+            `keyword decoration:blur:size ${nativeBlurSize}`,
+            `keyword decoration:blur:passes ${nativeBlurPasses}`,
+            "keyword decoration:blur:ignore_opacity 1",
+            "keyword decoration:blur:new_optimizations 1",
+        ]);
+    }
+
+    function applyHgLayers(): void {
+        Hypr.extras.batchMessage([
+            `keyword plugin:hyprglass:layers:enabled ${hgLayersEnabled ? 1 : 0}`,
+            "keyword plugin:hyprglass:layers:namespaces caelestia-drawers",
+            "keyword plugin:hyprglass:layers:preset subtle",
+            "keyword plugin:hyprglass:layers:namespace_mask_thresholds caelestia-drawers=0.1",
+        ]);
     }
 
     function applyAllHg(): void {
@@ -98,10 +140,25 @@ Item {
             lens_distortion: hgLensDistortion,
             vibrancy: hgVibrancy,
             vibrancy_darkness: hgVibrancyDarkness,
+            layers_enabled: hgLayersEnabled,
+            native_blur_enabled: nativeBlurEnabled,
+            native_blur_size: nativeBlurSize,
+            native_blur_passes: nativeBlurPasses,
+            ghostty_preset: ghosttyPreset,
         };
         jsonFile.setText(JSON.stringify(data, null, 2) + "\n");
 
         const conf = [
+            "decoration {",
+            "    blur {",
+            `        enabled = ${nativeBlurEnabled ? 1 : 0}`,
+            `        size = ${nativeBlurSize}`,
+            `        passes = ${nativeBlurPasses}`,
+            "        ignore_opacity = 1",
+            "        new_optimizations = 1",
+            "    }",
+            "}",
+            "",
             "plugin {",
             "    hyprglass {",
             `        enabled = ${hgEnabled ? 1 : 0}`,
@@ -115,6 +172,13 @@ Item {
             `        lens_distortion = ${hgLensDistortion}`,
             `        vibrancy = ${hgVibrancy}`,
             `        vibrancy_darkness = ${hgVibrancyDarkness}`,
+            "",
+            "        layers {",
+            `            enabled = ${hgLayersEnabled ? 1 : 0}`,
+            "            namespaces = caelestia-drawers",
+            "            preset = subtle",
+            "            namespace_mask_thresholds = caelestia-drawers=0.1",
+            "        }",
             "    }",
             "}",
         ].join("\n") + "\n";
@@ -135,12 +199,63 @@ Item {
 
     function saveGhostty(): void {
         Quickshell.execDetached(["sh", "-c",
-            `sed -i -e 's/^background-opacity = .*/background-opacity = ${ghosttyOpacity}/' ` +
-            `-e 's/^background-blur = .*/background-blur = ${ghosttyBlur}/' ` +
+            `sed -i -E -e 's/^background-opacity\\s*=.*/background-opacity = ${ghosttyOpacity}/' ` +
+            `-e 's/^background-blur\\s*=.*/background-blur = ${ghosttyBlur}/' ` +
             `'${ghosttyPath}' && ` +
             `gdbus call --session --dest com.mitchellh.ghostty ` +
             `--object-path /com/mitchellh/ghostty ` +
             `--method org.gtk.Actions.Activate reload-config '[]' '{}'`]);
+    }
+
+    function setGhosttyPreset(preset: string): void {
+        ghosttyPreset = preset;
+        Quickshell.execDetached([effectsTool, "set-ghostty-preset", preset]);
+        liveRefreshDebounce.restart();
+    }
+
+    function refreshLive(): void {
+        if (!liveStateProc.running)
+            liveStateProc.running = true;
+    }
+
+    function reloadHyprGlassPlugin(): void {
+        Quickshell.execDetached([effectsTool, "reload-plugin"]);
+        liveRefreshDebounce.restart();
+    }
+
+    function applyLiveState(text: string): void {
+        try {
+            const data = JSON.parse(text);
+            const blur = data.native_blur ?? {};
+            if (blur.enabled !== null && blur.enabled !== undefined) nativeBlurEnabled = blur.enabled;
+            if (blur.size !== null && blur.size !== undefined) nativeBlurSize = blur.size;
+            if (blur.passes !== null && blur.passes !== undefined) nativeBlurPasses = blur.passes;
+
+            const hg = data.hyprglass ?? {};
+            if (hg.enabled !== null && hg.enabled !== undefined) hgEnabled = hg.enabled;
+            if (hg.blur_strength !== null && hg.blur_strength !== undefined) hgBlurStrength = hg.blur_strength;
+            if (hg.blur_iterations !== null && hg.blur_iterations !== undefined) hgBlurIterations = hg.blur_iterations;
+            if (hg.refraction_strength !== null && hg.refraction_strength !== undefined) hgRefractionStrength = hg.refraction_strength;
+            if (hg.chromatic_aberration !== null && hg.chromatic_aberration !== undefined) hgChromaticAberration = hg.chromatic_aberration;
+            if (hg.fresnel_strength !== null && hg.fresnel_strength !== undefined) hgFresnelStrength = hg.fresnel_strength;
+            if (hg.specular_strength !== null && hg.specular_strength !== undefined) hgSpecularStrength = hg.specular_strength;
+            if (hg.edge_thickness !== null && hg.edge_thickness !== undefined) hgEdgeThickness = hg.edge_thickness;
+            if (hg.lens_distortion !== null && hg.lens_distortion !== undefined) hgLensDistortion = hg.lens_distortion;
+            if (hg.vibrancy !== null && hg.vibrancy !== undefined) hgVibrancy = hg.vibrancy;
+            if (hg.vibrancy_darkness !== null && hg.vibrancy_darkness !== undefined) hgVibrancyDarkness = hg.vibrancy_darkness;
+            if (hg.layers_enabled !== null && hg.layers_enabled !== undefined) hgLayersEnabled = hg.layers_enabled;
+            hgPluginLoaded = hg.loaded ?? false;
+            hgHyprpmEnabled = hg.hyprpm_enabled ?? false;
+
+            const ghostty = data.ghostty ?? {};
+            if (ghostty.opacity !== null && ghostty.opacity !== undefined) ghosttyOpacity = ghostty.opacity;
+            if (ghostty.blur !== null && ghostty.blur !== undefined) ghosttyBlur = ghostty.blur;
+            ghosttyPreset = data.rules?.ghostty_preset ?? ghosttyPreset;
+            effectsConfigErrors = data.config_errors ?? "";
+            effectsStatus = qsTr("Live state refreshed");
+        } catch (e) {
+            effectsStatus = qsTr("Live readback failed: %1").arg(e);
+        }
     }
 
     function loadFromJson(text: string): void {
@@ -157,6 +272,11 @@ Item {
             hgLensDistortion = data.lens_distortion ?? hgDefaults.lens_distortion;
             hgVibrancy = data.vibrancy ?? hgDefaults.vibrancy;
             hgVibrancyDarkness = data.vibrancy_darkness ?? hgDefaults.vibrancy_darkness;
+            hgLayersEnabled = data.layers_enabled ?? hgDefaults.layers_enabled;
+            nativeBlurEnabled = data.native_blur_enabled ?? nativeBlurDefaults.enabled;
+            nativeBlurSize = data.native_blur_size ?? nativeBlurDefaults.size;
+            nativeBlurPasses = data.native_blur_passes ?? nativeBlurDefaults.passes;
+            ghosttyPreset = data.ghostty_preset ?? ghosttyPreset;
         } catch (e) {
             console.warn("EffectsTab: JSON parse failed, using defaults");
         }
@@ -175,6 +295,11 @@ Item {
         hgLensDistortion = hgDefaults.lens_distortion;
         hgVibrancy = hgDefaults.vibrancy;
         hgVibrancyDarkness = hgDefaults.vibrancy_darkness;
+        hgLayersEnabled = hgDefaults.layers_enabled;
+
+        nativeBlurEnabled = nativeBlurDefaults.enabled;
+        nativeBlurSize = nativeBlurDefaults.size;
+        nativeBlurPasses = nativeBlurDefaults.passes;
 
         GlobalConfig.appearance.transparency.enabled = trDefaults.enabled;
         GlobalConfig.appearance.transparency.base = trDefaults.base;
@@ -182,10 +307,14 @@ Item {
 
         ghosttyOpacity = ghosttyDefaults.opacity;
         ghosttyBlur = ghosttyDefaults.blur;
+        ghosttyPreset = "glass";
 
         save();
+        applyAllNativeBlur();
         applyAllHg();
+        applyHgLayers();
         saveGhostty();
+        setGhosttyPreset(ghosttyPreset);
     }
 
     FileView {
@@ -214,6 +343,34 @@ Item {
         printErrors: false
         onLoaded: root.loadGhosttyConfig(text())
     }
+
+    Process {
+        id: liveStateProc
+
+        command: [root.effectsTool, "state"]
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: root.applyLiveState(text)
+        }
+    }
+
+    Timer {
+        id: liveRefreshDebounce
+
+        interval: 800
+        onTriggered: root.refreshLive()
+    }
+
+    Connections {
+        function onConfigReloaded(): void {
+            root.refreshLive();
+        }
+
+        target: Hypr
+    }
+
+    Component.onCompleted: root.refreshLive()
 
     Timer {
         id: saveDebounce
@@ -258,16 +415,24 @@ Item {
 
                     IconTextButton {
                         icon: "auto_awesome"
-                        text: (Colours.transparency.enabled && root.hgEnabled)
+                        text: (Colours.transparency.enabled && root.nativeBlurEnabled && root.hgEnabled && root.hgLayersEnabled && root.ghosttyBlur)
                             ? qsTr("All effects on")
                             : qsTr("All effects off")
-                        checked: Colours.transparency.enabled && root.hgEnabled
+                        checked: Colours.transparency.enabled && root.nativeBlurEnabled && root.hgEnabled && root.hgLayersEnabled && root.ghosttyBlur
                         type: IconTextButton.Filled
                         onClicked: {
-                            const enable = !(Colours.transparency.enabled && root.hgEnabled);
+                            const enable = !(Colours.transparency.enabled && root.nativeBlurEnabled && root.hgEnabled && root.hgLayersEnabled && root.ghosttyBlur);
                             GlobalConfig.appearance.transparency.enabled = enable;
+                            root.nativeBlurEnabled = enable;
                             root.hgEnabled = enable;
+                            root.hgLayersEnabled = enable;
+                            root.ghosttyBlur = enable;
+                            root.ghosttyPreset = enable ? "glass" : "off";
+                            root.applyNativeBlur("enabled", enable ? 1 : 0);
                             root.applyHg("enabled", enable ? 1 : 0);
+                            root.applyHgLayers();
+                            root.saveGhostty();
+                            root.setGhosttyPreset(root.ghosttyPreset);
                             root.saveDebounce.restart();
                         }
                     }
@@ -276,10 +441,72 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 IconTextButton {
+                    icon: "sync"
+                    text: qsTr("Read live")
+                    type: IconTextButton.Tonal
+                    onClicked: root.refreshLive()
+                }
+
+                IconTextButton {
+                    icon: "extension"
+                    text: qsTr("Reload HyprGlass")
+                    type: IconTextButton.Tonal
+                    onClicked: root.reloadHyprGlassPlugin()
+                }
+
+                IconTextButton {
                     icon: "restart_alt"
                     text: qsTr("Default")
                     type: IconTextButton.Tonal
                     onClicked: root.resetToDefaults()
+                }
+            }
+
+            // ── Live status ───────────────────────────────────────────────────
+            StyledRect {
+                Layout.fillWidth: true
+                implicitHeight: liveStatus.implicitHeight + Tokens.padding.normal * 2
+                radius: Tokens.rounding.normal
+                color: (!root.hgPluginLoaded || root.effectsConfigErrors.length > 0)
+                    ? Qt.alpha(Colours.palette.m3errorContainer, 0.7)
+                    : Colours.tPalette.m3surfaceContainer
+
+                ColumnLayout {
+                    id: liveStatus
+
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Tokens.padding.normal
+                    spacing: Tokens.spacing.smaller
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: qsTr("Live readback: native blur %1 · Ghostty preset %2 · HyprGlass plugin %3")
+                            .arg(root.nativeBlurEnabled ? qsTr("on") : qsTr("off"))
+                            .arg(root.ghosttyPreset)
+                            .arg(root.hgPluginLoaded ? qsTr("loaded") : (root.hgHyprpmEnabled ? qsTr("enabled but not loaded") : qsTr("not enabled")))
+                        color: Colours.palette.m3onSurface
+                        wrapMode: Text.WordWrap
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        visible: root.effectsStatus.length > 0
+                        text: root.effectsStatus
+                        color: Colours.palette.m3onSurfaceVariant
+                        font.pointSize: Tokens.font.size.smaller
+                        wrapMode: Text.WordWrap
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        visible: root.effectsConfigErrors.length > 0
+                        text: root.effectsConfigErrors
+                        color: Colours.palette.m3error
+                        font.pointSize: Tokens.font.size.smaller
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
 
@@ -343,6 +570,69 @@ Item {
                 }
             }
 
+            // ── Hyprland native blur ────────────────────────────────────────
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Tokens.spacing.small
+
+                StyledText {
+                    text: qsTr("Hyprland blur")
+                    font.pointSize: Tokens.font.size.normal
+                    color: Colours.palette.m3onSurfaceVariant
+                }
+
+                SwitchRow {
+                    label: qsTr("Enabled")
+                    checked: root.nativeBlurEnabled
+                    onToggled: checked => {
+                        root.nativeBlurEnabled = checked;
+                        root.applyNativeBlur("enabled", checked ? 1 : 0);
+                        root.saveDebounce.restart();
+                    }
+                }
+
+                StyledRect {
+                    Layout.fillWidth: true
+                    implicitHeight: blurSliders.implicitHeight + Tokens.padding.normal * 2
+                    radius: Tokens.rounding.normal
+                    color: Colours.tPalette.m3surfaceContainer
+                    opacity: root.nativeBlurEnabled ? 1.0 : 0.5
+
+                    ColumnLayout {
+                        id: blurSliders
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: Tokens.padding.normal
+                        spacing: Tokens.spacing.normal
+                        enabled: root.nativeBlurEnabled
+
+                        EffectSlider {
+                            label: qsTr("Size")
+                            value: root.nativeBlurSize
+                            from: 1; to: 20; stepSize: 1; decimals: 0
+                            onValueModified: v => {
+                                root.nativeBlurSize = Math.round(v);
+                                root.applyNativeBlur("size", Math.round(v));
+                                root.saveDebounce.restart();
+                            }
+                        }
+
+                        EffectSlider {
+                            label: qsTr("Passes")
+                            value: root.nativeBlurPasses
+                            from: 1; to: 6; stepSize: 1; decimals: 0
+                            onValueModified: v => {
+                                root.nativeBlurPasses = Math.round(v);
+                                root.applyNativeBlur("passes", Math.round(v));
+                                root.saveDebounce.restart();
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── HyprGlass ────────────────────────────────────────────────────
             ColumnLayout {
                 Layout.fillWidth: true
@@ -360,6 +650,16 @@ Item {
                     onToggled: checked => {
                         root.hgEnabled = checked;
                         root.applyHg("enabled", checked ? 1 : 0);
+                        root.saveDebounce.restart();
+                    }
+                }
+
+                SwitchRow {
+                    label: qsTr("Caelestia drawer glass")
+                    checked: root.hgLayersEnabled
+                    onToggled: checked => {
+                        root.hgLayersEnabled = checked;
+                        root.applyHgLayers();
                         root.saveDebounce.restart();
                     }
                 }
@@ -526,7 +826,48 @@ Item {
                             checked: root.ghosttyBlur
                             onToggled: checked => {
                                 root.ghosttyBlur = checked;
+                                if (checked && !root.nativeBlurEnabled) {
+                                    root.nativeBlurEnabled = true;
+                                    root.applyNativeBlur("enabled", 1);
+                                    root.saveDebounce.restart();
+                                }
                                 root.saveGhostty();
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: Tokens.spacing.smaller
+
+                            StyledText {
+                                text: qsTr("HyprGlass preset rule")
+                                font.pointSize: Tokens.font.size.smaller
+                                color: Colours.palette.m3onSurfaceVariant
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: Tokens.spacing.small
+
+                                Repeater {
+                                    model: [
+                                        { id: "off", label: qsTr("Off") },
+                                        { id: "subtle", label: qsTr("Subtle") },
+                                        { id: "clear", label: qsTr("Clear") },
+                                        { id: "glass", label: qsTr("Glass") },
+                                        { id: "high_contrast", label: qsTr("High contrast") },
+                                    ]
+
+                                    delegate: IconTextButton {
+                                        required property var modelData
+                                        text: modelData.label
+                                        checked: root.ghosttyPreset === modelData.id
+                                        type: IconTextButton.Tonal
+                                        font.pointSize: Tokens.font.size.smaller
+                                        verticalPadding: Tokens.padding.small
+                                        onClicked: root.setGhosttyPreset(modelData.id)
+                                    }
+                                }
                             }
                         }
                     }
@@ -578,7 +919,9 @@ Item {
             to: slider.to
             stepSize: slider.stepSize
             value: slider.value
+            live: false
             onMoved: slider.valueModified(value)
+            onPressedChanged: if (!pressed) slider.valueModified(value)
         }
     }
 }

@@ -9,7 +9,10 @@ import qs.components.containers
 import qs.services
 
 Variants {
-    model: Screens.screens.filter(s => GlobalConfig.forScreen(s.name).background.enabled)
+    // NaxeCode fork: allow wallpaper-only backgrounds on OLED-blackout screens.
+    // Screens.screens filters enabled:false monitors, but DP-2 keeps enabled:false
+    // to suppress idle chrome while background.enabled=true restores wallpaper/blur context.
+    model: Quickshell.screens.filter(s => GlobalConfig.forScreen(s.name).background.enabled)
 
     StyledWindow {
         id: win
