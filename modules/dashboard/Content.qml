@@ -41,6 +41,12 @@ Item {
                 text: qsTr("Weather"),
                 enabled: Config.dashboard.showWeather
             },
+            {
+                component: ambientComponent,
+                iconName: "auto_awesome",
+                text: qsTr("Ambient"),
+                enabled: true
+            },
             // NaxeCode fork: System tab — pp-* / mon-* control + telemetry from pp-data.
             {
                 component: systemComponent,
@@ -195,6 +201,11 @@ Item {
                 WeatherTab {}
             }
 
+            Component {
+                id: ambientComponent
+
+                AmbientTab {}
+            }
             // NaxeCode fork
             Component {
                 id: systemComponent

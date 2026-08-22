@@ -52,6 +52,10 @@ Variants {
 
                 sourceComponent: Wallpaper {}
             }
+            AmbientField {
+                anchors.fill: parent
+                screen: win.modelData
+            }
 
             Visualiser {
                 anchors.fill: parent
