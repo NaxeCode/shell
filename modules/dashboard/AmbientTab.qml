@@ -105,5 +105,36 @@ Item {
                 onClicked: Quickshell.execDetached(["ambient", "autonomy", "automatic"])
             }
         }
+
+        RowLayout {
+            Layout.fillWidth: true
+
+            StyledText {
+                text: qsTr("Reach") + qsTr(": ") + (Ambient.controls.reach ?? "shell")
+                color: Colours.palette.m3onSurfaceVariant
+                Layout.fillWidth: true
+            }
+
+            IconTextButton {
+                icon: "desktop_windows"
+                text: qsTr("Shell")
+                type: IconTextButton.Tonal
+                onClicked: Quickshell.execDetached(["ambient", "reach", "shell"])
+            }
+
+            IconTextButton {
+                icon: "apps"
+                text: qsTr("Hot apps")
+                type: IconTextButton.Tonal
+                onClicked: Quickshell.execDetached(["ambient", "reach", "hot-apps"])
+            }
+
+            IconTextButton {
+                icon: "settings_suggest"
+                text: qsTr("Whole system")
+                type: IconTextButton.Tonal
+                onClicked: Quickshell.execDetached(["ambient", "reach", "whole-system"])
+            }
+        }
     }
 }
