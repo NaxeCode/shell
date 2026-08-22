@@ -7,13 +7,12 @@ import qs.components
 Item {
     id: root
 
-    required property var screen
-    required property DrawerVisibilities visibilities
+    required property ScreenState screenState
     required property bool sidebarVisible
     readonly property real nonAnimWidth: content.implicitWidth
 
-    readonly property bool shouldBeActive: visibilities.session && Config.session.enabled
-    readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
+    readonly property bool shouldBeActive: screenState.session && Config.session.enabled
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(screenState.modelData.name).enabled
     readonly property real hiddenOverscan: oledBlackout ? 32 : 5
     property real offsetScale: shouldBeActive ? 0 : 1
     property real sidebarOffset: sidebarVisible ? 14 : 0
@@ -25,9 +24,7 @@ Item {
     opacity: 1 - offsetScale
 
     Behavior on offsetScale {
-        Anim {
-            type: Anim.DefaultSpatial
-        }
+        Anim {}
     }
 
     Loader {
@@ -39,7 +36,7 @@ Item {
         active: root.shouldBeActive || root.visible
 
         sourceComponent: Content {
-            visibilities: root.visibilities
+            screenState: root.screenState
         }
     }
 }

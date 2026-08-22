@@ -10,29 +10,21 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    // Profile
-    readonly property string profileActive: state.profileActive
-    readonly property string profileSaved: state.profileSaved
-
-    // Monitor layout (last `mon-*` button — not real-time hyprctl state)
-    readonly property string monitorMode: state.monitorMode
+    readonly property bool autoHdr: state.autoHdr
     readonly property int awHz: state.awHz
+    readonly property bool cpuBoost: state.cpuBoost
+    readonly property string cpuEpp: state.cpuEpp
+    readonly property int cpuFreqAvgMhz: state.cpuFreqAvgMhz
+    readonly property int cpuFreqMaxMhz: state.cpuFreqMaxMhz
 
     // CPU
     readonly property int cpuPkgW: state.cpuPkgW
-    readonly property int cpuFreqAvgMhz: state.cpuFreqAvgMhz
-    readonly property int cpuFreqMaxMhz: state.cpuFreqMaxMhz
-    readonly property string cpuEpp: state.cpuEpp
-    readonly property bool cpuBoost: state.cpuBoost
+    readonly property int gpuPowerCapW: state.gpuPowerCapW
 
     // GPU
     readonly property int gpuPowerW: state.gpuPowerW
-    readonly property int gpuPowerCapW: state.gpuPowerCapW
     readonly property int gpuUsagePct: state.gpuUsagePct
     readonly property int gpuVOffsetMv: state.gpuVOffsetMv
-
-    // Govee room sensor; null if listener hasn't broadcast yet
-    readonly property var room: state.room
 
     // Per-monitor conf state parsed from generated ~/.config/hypr/monitor-layout.conf.
     // Keyed by output name. Each value: { vrr, cm, mode, bitdepth, ... }.
@@ -40,52 +32,17 @@ Singleton {
     // for `vrr=2` (fullscreen-only) it shows false at idle even though VRR
     // is configured on. Conf values are the truth for "is VRR enabled?".
     readonly property var monitorConf: state.monitorConf
-    readonly property bool autoHdr: state.autoHdr
 
+    // Monitor layout (last `mon-*` button — not real-time hyprctl state)
+    readonly property string monitorMode: state.monitorMode
+
+    // Profile
+    readonly property string profileActive: state.profileActive
+    readonly property string profileSaved: state.profileSaved
     readonly property bool ready: state.ready
 
-    function setProfile(name: string): void {
-        if (!["cool", "normal", "gaming"].includes(name))
-            return;
-        Quickshell.execDetached(["sh", "-c", `~/.local/bin/pp-${name}`]);
-    }
-
-    function setMonitorMode(mode: string): void {
-        const map = { desk: "mon-desk", cintiq: "mon-cin", gaming: "mon-gam", "cool-s": "mon-cool-s" };
-        const cmd = map[mode];
-        if (!cmd)
-            return;
-        Quickshell.execDetached(["sh", "-c", `flock -n "$XDG_RUNTIME_DIR/caelestia-monitor-mode.lock" ~/.local/bin/${cmd}`]);
-    }
-
-    function setAutoHdr(enabled: bool): void {
-        state.autoHdr = enabled;
-        const cmd = `${Quickshell.env("HOME")}/.local/bin/hypr-auto-hdr ${enabled ? "on" : "off"} >> ${Quickshell.env("HOME")}/.local/state/hypr-auto-hdr.log 2>&1`;
-        console.warn("SysControl auto HDR:", cmd);
-        Quickshell.execDetached(["sh", "-lc", cmd]);
-    }
-
-    QtObject {
-        id: state
-
-        property string profileActive: "?"
-        property string profileSaved: "?"
-        property string monitorMode: "?"
-        property int awHz: 0
-        property int cpuPkgW: 0
-        property int cpuFreqAvgMhz: 0
-        property int cpuFreqMaxMhz: 0
-        property string cpuEpp: "?"
-        property bool cpuBoost: false
-        property int gpuPowerW: 0
-        property int gpuPowerCapW: 0
-        property int gpuUsagePct: 0
-        property int gpuVOffsetMv: 0
-        property var room: null
-        property bool ready: false
-        property var monitorConf: ({})
-        property bool autoHdr: false
-    }
+    // Govee room sensor; null if listener hasn't broadcast yet
+    readonly property var room: state.room
 
     function _parseAutoHdr(text: string): bool {
         const match = text.match(/^\s*cm_auto_hdr\s*=\s*(\d+)/m);
@@ -123,9 +80,58 @@ Singleton {
         return result;
     }
 
+    function setAutoHdr(enabled: bool): void {
+        state.autoHdr = enabled;
+        const cmd = `${Quickshell.env("HOME")}/.local/bin/hypr-auto-hdr ${enabled ? "on" : "off"} >> ${Quickshell.env("HOME")}/.local/state/hypr-auto-hdr.log 2>&1`;
+        console.warn("SysControl auto HDR:", cmd);
+        Quickshell.execDetached(["sh", "-lc", cmd]);
+    }
+
+    function setMonitorMode(mode: string): void {
+        const map = {
+            desk: "mon-desk",
+            cintiq: "mon-cin",
+            gaming: "mon-gam",
+            "cool-s": "mon-cool-s"
+        };
+        const cmd = map[mode];
+        if (!cmd)
+            return;
+        Quickshell.execDetached(["sh", "-c", `flock -n "$XDG_RUNTIME_DIR/caelestia-monitor-mode.lock" ~/.local/bin/${cmd}`]);
+    }
+
+    function setProfile(name: string): void {
+        if (!["cool", "normal", "gaming"].includes(name))
+            return;
+        Quickshell.execDetached(["sh", "-c", `~/.local/bin/pp-${name}`]);
+    }
+
+    QtObject {
+        id: state
+
+        property bool autoHdr: false
+        property int awHz: 0
+        property bool cpuBoost: false
+        property string cpuEpp: "?"
+        property int cpuFreqAvgMhz: 0
+        property int cpuFreqMaxMhz: 0
+        property int cpuPkgW: 0
+        property int gpuPowerCapW: 0
+        property int gpuPowerW: 0
+        property int gpuUsagePct: 0
+        property int gpuVOffsetMv: 0
+        property var monitorConf: ({})
+        property string monitorMode: "?"
+        property string profileActive: "?"
+        property string profileSaved: "?"
+        property bool ready: false
+        property var room: null
+    }
+
     FileView {
         path: Quickshell.env("HOME") + "/.config/hypr/monitor-layout.conf"
         watchChanges: true
+
         onFileChanged: reload()
         onLoaded: state.monitorConf = root._parseHyprConf(text())
     }
@@ -133,6 +139,7 @@ Singleton {
     FileView {
         path: Quickshell.env("HOME") + "/.config/hypr/hyprland.conf"
         watchChanges: true
+
         onFileChanged: reload()
         onLoaded: state.autoHdr = root._parseAutoHdr(text())
     }
@@ -176,9 +183,10 @@ Singleton {
 
     Timer {
         interval: 2000
-        running: true
         repeat: true
+        running: true
         triggeredOnStart: true
+
         onTriggered: {
             if (!dataProc.running)
                 dataProc.running = true;

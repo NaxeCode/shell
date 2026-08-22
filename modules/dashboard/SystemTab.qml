@@ -13,55 +13,100 @@ Item {
     id: root
 
     readonly property int minWidth: 640
-    implicitWidth: Math.max(minWidth, layout.implicitWidth + Tokens.padding.large * 2)
-    implicitHeight: layout.implicitHeight + Tokens.padding.large * 2
 
     // Helpers — derive everything from lastIpcObject so cable swaps don't break.
     function fmtHz(hz): string {
-        if (!hz) return "—";
+        if (!hz)
+            return "—";
         const rounded = Math.round(hz);
         if (Math.abs(hz - rounded) < 0.01)
             return `${rounded}`;
         return hz.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
     }
 
-    function monAvailableRates(monitor): var {
+    // Apply runtime monitor changes via the mon-set helper, which edits the
+    // matching monitorv2 block in generated monitor-layout.conf and reloads.
+    // Disabled outputs must not also have matching monitorv2 blocks, so the
+    // old hyprland.conf editor broke after monitor layout generation moved to
+    // monitor-layout.conf. Only changed key(s) get sent; unrelated fields stay.
+    function monApply(monitor, opts): void {
+        if (!monitor?.lastIpcObject)
+            return;
+        const args = ["mon-set", monitor.name];
+        if (opts?.mode?.value)
+            args.push(`mode=${opts.mode.value}`);
+        if (opts?.vrr !== undefined)
+            args.push(`vrr=${opts.vrr ? 1 : 0}`);
+        if (opts?.cm !== undefined)
+            args.push(`cm=${opts.cm}`);
+        if (args.length > 2)
+            Quickshell.execDetached(args);
+    }
+
+    function monAvailableModes(monitor): var {
         const obj = monitor?.lastIpcObject;
-        if (!obj) return [];
-        const prefix = `${obj.width}x${obj.height}@`;
-        const modes = obj.availableModes ?? [];
+        if (!obj)
+            return [];
+
         const seen = new Set();
-        const rates = [];
-        for (const m of modes) {
-            if (!m.startsWith(prefix)) continue;
-            const match = m.match(/@([\d.]+)Hz/);
-            if (!match) continue;
-            const r = parseFloat(match[1]);
-            // Drop cinematic / film fallback rates (24/25/30/50). Anything <59
-            // is never what the user means by "switch refresh rate" on a desktop.
-            if (r < 59) continue;
-            const key = r.toFixed(2);
-            if (seen.has(key)) continue;
+        const modes = [];
+        for (const raw of obj.availableModes ?? []) {
+            const match = raw.match(/^(\d+)x(\d+)@([\d.]+)Hz$/);
+            if (!match)
+                continue;
+            const mode = {
+                width: Number(match[1]),
+                height: Number(match[2]),
+                rate: Number(match[3]),
+                value: raw.replace(/Hz$/, "")
+            };
+            if (mode.rate < 59)
+                continue;
+            const key = `${mode.width}x${mode.height}@${mode.rate.toFixed(2)}`;
+            if (seen.has(key))
+                continue;
             seen.add(key);
-            rates.push(r);
+            modes.push(mode);
         }
-        const sorted = rates.sort((a, b) => a - b);
-        // Hide NTSC/video-rate aliases when the same resolution also exposes the
-        // exact PC timing. Example: Cintiq offers 59.94 and 60.00; keep 60.00.
-        // If exact 60 is absent (Dell/AW 1440p expose 59.95), keep fractional.
-        return sorted.filter(r => {
-            const rounded = Math.round(r);
-            const hasExactPeer = sorted.some(o => Math.abs(o - rounded) < 0.01 && Math.abs(o - r) < 0.2);
-            return Math.abs(r - rounded) < 0.01 || !hasExactPeer;
+
+        return modes.filter(mode => {
+            const rounded = Math.round(mode.rate);
+            const hasExactPeer = modes.some(peer => peer.width === mode.width && peer.height === mode.height && Math.abs(peer.rate - rounded) < 0.01 && Math.abs(peer.rate - mode.rate) < 0.2);
+            return Math.abs(mode.rate - rounded) < 0.01 || !hasExactPeer;
         });
     }
 
-    // Hyprland/DRM do not expose a usable vrr_capable flag through Quickshell.
-    // Keep this allowlist explicit: high fixed refresh (e.g. Dell P2425HE 100 Hz)
-    // is not the same thing as Adaptive-Sync/VRR support.
-    function monSupportsVrr(monitor): bool {
-        const desc = monitor?.lastIpcObject?.description ?? "";
-        return desc.includes("DELL S3221QS") || desc.includes("AW3225QF");
+    function monAvailableResolutions(monitor): var {
+        const preferredAwModes = ["3840x2160", "2560x1440", "1920x1080"];
+        const seen = new Set();
+        return monAvailableModes(monitor).filter(mode => {
+            const key = `${mode.width}x${mode.height}`;
+            if (monIsAwOled(monitor) && !preferredAwModes.includes(key))
+                return false;
+            if (seen.has(key))
+                return false;
+            seen.add(key);
+            return true;
+        }).sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    }
+
+    function monIsAwOled(monitor): bool {
+        return (monitor?.lastIpcObject?.description ?? "").includes("AW3225QF");
+    }
+
+    function monModeForResolution(monitor, width: int, height: int): var {
+        const currentRate = monitor?.lastIpcObject?.refreshRate ?? 60;
+        const modes = monAvailableModes(monitor).filter(mode => mode.width === width && mode.height === height);
+        if (!modes.length)
+            return null;
+        return modes.reduce((best, mode) => Math.abs(mode.rate - currentRate) < Math.abs(best.rate - currentRate) ? mode : best);
+    }
+
+    function monModesForCurrentResolution(monitor): var {
+        const obj = monitor?.lastIpcObject;
+        if (!obj)
+            return [];
+        return monAvailableModes(monitor).filter(mode => mode.width === obj.width && mode.height === obj.height).sort((a, b) => a.rate - b.rate);
     }
 
     // Heuristic: panel currently running 10-bit (XRGB2101010) is HDR-capable.
@@ -73,28 +118,12 @@ Item {
         return fmt.includes("2101010");
     }
 
-    // Apply runtime monitor changes via the mon-set helper, which edits the
-    // matching monitorv2 block in generated monitor-layout.conf and reloads.
-    // Disabled outputs must not also have matching monitorv2 blocks, so the
-    // old hyprland.conf editor broke after monitor layout generation moved to
-    // monitor-layout.conf. Only changed key(s) get sent; unrelated fields stay.
-    function monApply(monitor, opts): void {
-        const obj = monitor?.lastIpcObject;
-        if (!obj) return;
-        const args = ["mon-set", monitor.name];
-        if (opts?.rate !== undefined) {
-            args.push(`mode=${obj.width}x${obj.height}@${opts.rate}`);
-            // Sync monitor-restore state file so generated layouts keep the
-            // selected AW rate for modes where it matters.
-            if (monitor.name === "DP-2")
-                Quickshell.execDetached(["sh", "-c", `printf '%s\\n' '${opts.rate}' > ~/.local/state/monitor-aw-hz`]);
-        }
-        if (opts?.vrr !== undefined)
-            args.push(`vrr=${opts.vrr ? 1 : 0}`);
-        if (opts?.cm !== undefined)
-            args.push(`cm=${opts.cm}`);
-        if (args.length > 2)
-            Quickshell.execDetached(args);
+    // Hyprland/DRM do not expose a usable vrr_capable flag through Quickshell.
+    // Keep this allowlist explicit: high fixed refresh (e.g. Dell P2425HE 100 Hz)
+    // is not the same thing as Adaptive-Sync/VRR support.
+    function monSupportsVrr(monitor): bool {
+        const desc = monitor?.lastIpcObject?.description ?? "";
+        return desc.includes("DELL S3221QS") || monIsAwOled(monitor);
     }
 
     function resetToDefaults(): void {
@@ -106,6 +135,9 @@ Item {
     function toggleAutoHdr(): void {
         SysControl.setAutoHdr(!SysControl.autoHdr);
     }
+
+    implicitHeight: layout.implicitHeight + Tokens.padding.large * 2
+    implicitWidth: Math.max(minWidth, layout.implicitWidth + Tokens.padding.large * 2)
 
     ColumnLayout {
         id: layout
@@ -120,23 +152,29 @@ Item {
             spacing: Tokens.spacing.small
 
             StyledText {
-                text: qsTr("System")
-                font.pointSize: Tokens.font.size.large
                 color: Colours.palette.m3onSurface
+                font: Tokens.font.body.large
+                text: qsTr("System")
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
+
             IconTextButton {
+                checked: SysControl.autoHdr
                 icon: "auto_awesome"
                 text: SysControl.autoHdr ? qsTr("Auto HDR") : qsTr("Auto HDR off")
-                checked: SysControl.autoHdr
                 type: IconTextButton.Tonal
+
                 onClicked: root.toggleAutoHdr()
             }
+
             IconTextButton {
                 icon: "restart_alt"
                 text: qsTr("Default")
                 type: IconTextButton.Tonal
+
                 onClicked: root.resetToDefaults()
             }
         }
@@ -147,9 +185,9 @@ Item {
             spacing: Tokens.spacing.small
 
             StyledText {
-                text: qsTr("Power profile")
-                font.pointSize: Tokens.font.size.normal
                 color: Colours.palette.m3onSurfaceVariant
+                font: Tokens.font.body.medium
+                text: qsTr("Power profile")
             }
 
             Flow {
@@ -158,18 +196,32 @@ Item {
 
                 Repeater {
                     model: [
-                        { id: "cool",   icon: "ac_unit",  label: qsTr("Cool")   },
-                        { id: "normal", icon: "balance",  label: qsTr("Normal") },
-                        { id: "gaming", icon: "rocket_launch", label: qsTr("Gaming") },
+                        {
+                            id: "cool",
+                            icon: "ac_unit",
+                            label: qsTr("Cool")
+                        },
+                        {
+                            id: "normal",
+                            icon: "balance",
+                            label: qsTr("Normal")
+                        },
+                        {
+                            id: "gaming",
+                            icon: "rocket_launch",
+                            label: qsTr("Gaming")
+                        },
                     ]
 
                     delegate: IconTextButton {
                         required property var modelData
+
+                        checked: SysControl.profileActive === modelData.id
+                        horizontalPadding: Tokens.padding.medium
                         icon: modelData.icon
                         text: modelData.label
-                        checked: SysControl.profileActive === modelData.id
                         type: IconTextButton.Filled
-                        horizontalPadding: Tokens.padding.normal
+
                         onClicked: SysControl.setProfile(modelData.id)
                     }
                 }
@@ -177,12 +229,10 @@ Item {
 
             StyledText {
                 Layout.fillWidth: true
-                visible: SysControl.profileActive !== SysControl.profileSaved
-                text: qsTr("Active = %1, saved = %2 — run power-profile %2 to sync")
-                    .arg(SysControl.profileActive)
-                    .arg(SysControl.profileSaved)
-                font.pointSize: Tokens.font.size.smaller
                 color: Colours.palette.m3error
+                font: Tokens.font.body.small
+                text: qsTr("Active = %1, saved = %2 — run power-profile %2 to sync").arg(SysControl.profileActive).arg(SysControl.profileSaved)
+                visible: SysControl.profileActive !== SysControl.profileSaved
                 wrapMode: Text.WordWrap
             }
         }
@@ -193,9 +243,9 @@ Item {
             spacing: Tokens.spacing.small
 
             StyledText {
-                text: qsTr("Monitor layout")
-                font.pointSize: Tokens.font.size.normal
                 color: Colours.palette.m3onSurfaceVariant
+                font: Tokens.font.body.medium
+                text: qsTr("Monitor layout")
             }
 
             Flow {
@@ -204,19 +254,37 @@ Item {
 
                 Repeater {
                     model: [
-                        { id: "desk",   icon: "dashboard_customize", label: qsTr("Studio")  },
-                        { id: "cool-s", icon: "desktop_windows",     label: qsTr("Desk")    },
-                        { id: "cintiq", icon: "draw",                label: qsTr("Cintiq")  },
-                        { id: "gaming", icon: "stadia_controller",   label: qsTr("Gaming")  },
+                        {
+                            id: "desk",
+                            icon: "dashboard_customize",
+                            label: qsTr("Studio")
+                        },
+                        {
+                            id: "cool-s",
+                            icon: "desktop_windows",
+                            label: qsTr("Desk")
+                        },
+                        {
+                            id: "cintiq",
+                            icon: "draw",
+                            label: qsTr("Cintiq")
+                        },
+                        {
+                            id: "gaming",
+                            icon: "stadia_controller",
+                            label: qsTr("Gaming")
+                        },
                     ]
 
                     delegate: IconTextButton {
                         required property var modelData
+
+                        checked: SysControl.monitorMode === modelData.id
+                        horizontalPadding: Tokens.padding.medium
                         icon: modelData.icon
                         text: modelData.label
-                        checked: SysControl.monitorMode === modelData.id
                         type: IconTextButton.Filled
-                        horizontalPadding: Tokens.padding.normal
+
                         onClicked: SysControl.setMonitorMode(modelData.id)
                     }
                 }
@@ -229,25 +297,35 @@ Item {
             spacing: Tokens.spacing.small
 
             StyledText {
-                text: qsTr("Connected monitors")
-                font.pointSize: Tokens.font.size.normal
                 color: Colours.palette.m3onSurfaceVariant
+                font: Tokens.font.body.medium
+                text: qsTr("Connected monitors")
             }
 
             GridLayout {
                 Layout.fillWidth: true
+                columnSpacing: Tokens.spacing.small
                 columns: 1
                 rowSpacing: Tokens.spacing.small
-                columnSpacing: Tokens.spacing.small
 
                 Repeater {
                     model: Hypr.monitors
 
                     delegate: StyledRect {
                         id: tile
-                        required property var modelData
+
+                        readonly property bool brightnessAvailable: brightnessMonitor !== null && brightnessMonitor !== undefined
+                        readonly property var brightnessMonitor: Brightness.getMonitor(modelData?.name ?? "")
+                        readonly property real brightnessValue: brightnessMonitor?.brightness ?? 0
+                        readonly property bool hdrCapable: root.monSupportsHdr(modelData)
+                        readonly property bool hdrOn: (modelData?.lastIpcObject?.colorManagementPreset ?? "srgb") !== "srgb"
                         readonly property real hz: modelData?.lastIpcObject?.refreshRate ?? 0
-                        readonly property var rates: root.monAvailableRates(modelData)
+                        readonly property bool isAwOled: root.monIsAwOled(modelData)
+                        readonly property int modeHeight: modelData?.lastIpcObject?.height ?? 0
+                        readonly property int modeWidth: modelData?.lastIpcObject?.width ?? 0
+                        required property var modelData
+                        readonly property var rates: root.monModesForCurrentResolution(modelData)
+                        readonly property var resolutions: root.monAvailableResolutions(modelData)
                         readonly property bool vrrCapable: root.monSupportsVrr(modelData)
                         // VRR state from conf, NOT from lastIpcObject.vrr.
                         // lastIpcObject.vrr reports engagement (bool); for
@@ -256,25 +334,21 @@ Item {
                             const v = SysControl.monitorConf[modelData?.name]?.vrr;
                             return v !== undefined && v !== "0";
                         }
-                        readonly property bool hdrCapable: root.monSupportsHdr(modelData)
-                        readonly property bool hdrOn: (modelData?.lastIpcObject?.colorManagementPreset ?? "srgb") !== "srgb"
-                        readonly property var brightnessMonitor: Brightness.getMonitor(modelData?.name ?? "")
-                        readonly property real brightnessValue: brightnessMonitor?.brightness ?? 0
-                        readonly property bool brightnessAvailable: brightnessMonitor !== null && brightnessMonitor !== undefined
 
                         Layout.fillWidth: true
-                        Layout.preferredHeight: monCol.implicitHeight + Tokens.padding.normal * 2
-                        radius: Tokens.rounding.normal
+                        Layout.preferredHeight: monCol.implicitHeight + Tokens.padding.medium * 2
                         color: Colours.tPalette.m3surfaceContainer
+                        radius: Tokens.rounding.medium
 
                         ColumnLayout {
                             id: monCol
+
                             anchors.left: parent.left
+                            anchors.leftMargin: Tokens.padding.medium
                             anchors.right: parent.right
+                            anchors.rightMargin: Tokens.padding.medium
                             anchors.top: parent.top
-                            anchors.leftMargin: Tokens.padding.normal
-                            anchors.rightMargin: Tokens.padding.normal
-                            anchors.topMargin: Tokens.padding.normal
+                            anchors.topMargin: Tokens.padding.medium
                             spacing: Tokens.spacing.small
 
                             // ── Header: icon + name + current Hz ──
@@ -283,70 +357,107 @@ Item {
                                 spacing: Tokens.spacing.small
 
                                 MaterialIcon {
-                                    text: "monitor"
                                     color: Colours.palette.m3onSurfaceVariant
-                                    font.pointSize: Tokens.font.size.normal
+                                    fontStyle: Tokens.font.icon.medium
+                                    text: "monitor"
                                 }
+
                                 ColumnLayout {
                                     spacing: 0
+
                                     StyledText {
-                                        text: tile.modelData?.name ?? "?"
-                                        font.pointSize: Tokens.font.size.smaller
                                         color: Colours.palette.m3onSurface
+                                        font: Tokens.font.body.small
+                                        text: tile.modelData?.name ?? "?"
                                     }
+
                                     StyledText {
-                                        text: `${root.fmtHz(tile.hz)} Hz`
-                                        font.pointSize: Tokens.font.size.normal
                                         color: Colours.palette.m3primary
+                                        font: Tokens.font.body.medium
+                                        text: `${tile.modeWidth}×${tile.modeHeight} · ${root.fmtHz(tile.hz)} Hz`
                                     }
                                 }
-                                Item { Layout.fillWidth: true }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                }
                             }
 
                             // ── Display brightness ──
                             RowLayout {
                                 Layout.fillWidth: true
-                                visible: tile.brightnessAvailable
                                 spacing: Tokens.spacing.small
+                                visible: tile.brightnessAvailable
 
                                 MaterialIcon {
-                                    text: `brightness_${Math.max(1, Math.min(7, Math.round(tile.brightnessValue * 6) + 1))}`
                                     color: Colours.palette.m3onSurfaceVariant
-                                    font.pointSize: Tokens.font.size.normal
+                                    fontStyle: Tokens.font.icon.medium
+                                    text: `brightness_${Math.max(1, Math.min(7, Math.round(tile.brightnessValue * 6) + 1))}`
                                 }
 
                                 StyledSlider {
                                     Layout.fillWidth: true
-                                    implicitHeight: Tokens.padding.normal * 3
+                                    implicitHeight: Tokens.padding.medium * 3
                                     value: tile.brightnessValue
+
                                     onMoved: tile.brightnessMonitor?.setBrightness(value)
                                 }
 
                                 StyledText {
-                                    text: `${Math.round(tile.brightnessValue * 100)}%`
                                     color: Colours.palette.m3onSurfaceVariant
-                                    font.pointSize: Tokens.font.size.smaller
+                                    font: Tokens.font.body.small
+                                    text: `${Math.round(tile.brightnessValue * 100)}%`
+                                }
+                            }
+
+                            // ── Dell AW OLED resolution buttons ──
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Tokens.spacing.extraSmall
+                                visible: tile.isAwOled && tile.resolutions.length > 1
+
+                                Repeater {
+                                    model: tile.resolutions
+
+                                    delegate: IconTextButton {
+                                        required property var modelData
+
+                                        Layout.fillWidth: true
+                                        checked: tile.modeWidth === modelData.width && tile.modeHeight === modelData.height
+                                        font: Tokens.font.body.small
+                                        text: `${modelData.width}×${modelData.height}`
+                                        type: IconTextButton.Tonal
+                                        verticalPadding: Tokens.padding.small
+
+                                        onClicked: root.monApply(tile.modelData, {
+                                            mode: root.monModeForResolution(tile.modelData, modelData.width, modelData.height)
+                                        })
+                                    }
                                 }
                             }
 
                             // ── Refresh rate buttons (only if multiple rates) ──
                             RowLayout {
                                 Layout.fillWidth: true
+                                spacing: Tokens.spacing.extraSmall
                                 visible: tile.rates.length > 1
-                                spacing: Tokens.spacing.smaller
 
                                 Repeater {
                                     model: tile.rates
 
                                     delegate: IconTextButton {
-                                        required property real modelData
+                                        required property var modelData
+
                                         Layout.fillWidth: true
-                                        text: root.fmtHz(modelData)
-                                        checked: Math.abs(tile.hz - modelData) < 0.05
+                                        checked: Math.abs(tile.hz - modelData.rate) < 0.05
+                                        font: Tokens.font.body.small
+                                        text: root.fmtHz(modelData.rate)
                                         type: IconTextButton.Tonal
-                                        font.pointSize: Tokens.font.size.smaller
                                         verticalPadding: Tokens.padding.small
-                                        onClicked: root.monApply(tile.modelData, { rate: modelData })
+
+                                        onClicked: root.monApply(tile.modelData, {
+                                            mode: modelData
+                                        })
                                     }
                                 }
                             }
@@ -354,33 +465,38 @@ Item {
                             // ── VRR + HDR toggles (only if heuristic detects support) ──
                             RowLayout {
                                 Layout.fillWidth: true
+                                spacing: Tokens.spacing.extraSmall
                                 visible: tile.vrrCapable || tile.hdrCapable
-                                spacing: Tokens.spacing.smaller
 
                                 IconTextButton {
                                     Layout.fillWidth: true
-                                    visible: tile.vrrCapable
+                                    checked: tile.vrrOn
+                                    font: Tokens.font.body.small
                                     icon: "tv_gen"
                                     text: tile.vrrOn ? qsTr("VRR on") : qsTr("VRR off")
-                                    checked: tile.vrrOn
                                     type: IconTextButton.Tonal
-                                    font.pointSize: Tokens.font.size.smaller
                                     verticalPadding: Tokens.padding.small
-                                    onClicked: root.monApply(tile.modelData, { vrr: !tile.vrrOn })
+                                    visible: tile.vrrCapable
+
+                                    onClicked: root.monApply(tile.modelData, {
+                                        vrr: !tile.vrrOn
+                                    })
                                 }
 
                                 IconTextButton {
                                     Layout.fillWidth: true
-                                    visible: tile.hdrCapable
+                                    checked: tile.hdrOn
+                                    font: Tokens.font.body.small
                                     icon: "hdr_on"
                                     text: tile.hdrOn ? qsTr("HDR on") : qsTr("HDR off")
-                                    checked: tile.hdrOn
                                     type: IconTextButton.Tonal
-                                    font.pointSize: Tokens.font.size.smaller
                                     verticalPadding: Tokens.padding.small
-                                    onClicked: root.monApply(tile.modelData, { cm: tile.hdrOn ? "srgb" : "hdredid" })
-                                }
+                                    visible: tile.hdrCapable
 
+                                    onClicked: root.monApply(tile.modelData, {
+                                        cm: tile.hdrOn ? "srgb" : "hdredid"
+                                    })
+                                }
                             }
                         }
                     }
@@ -391,54 +507,46 @@ Item {
         // ── Telemetry tile ────────────────────────────────────────────────────
         StyledRect {
             Layout.fillWidth: true
-            Layout.preferredHeight: telemetry.implicitHeight + Tokens.padding.normal * 2
-            radius: Tokens.rounding.normal
+            Layout.preferredHeight: telemetry.implicitHeight + Tokens.padding.medium * 2
             color: Colours.tPalette.m3surfaceContainer
+            radius: Tokens.rounding.medium
 
             ColumnLayout {
                 id: telemetry
 
                 anchors.left: parent.left
+                anchors.margins: Tokens.padding.medium
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.margins: Tokens.padding.normal
                 spacing: Tokens.spacing.small
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: Tokens.spacing.larger
+                    spacing: Tokens.spacing.large
 
                     StatTile {
                         Layout.fillWidth: true
                         icon: "memory"
                         label: qsTr("CPU")
+                        sub: SysControl.ready ? `${SysControl.cpuFreqAvgMhz} MHz · ${SysControl.cpuBoost ? "boost" : "no boost"}` : ""
                         value: SysControl.ready ? `${SysControl.cpuPkgW} W` : "—"
-                        sub: SysControl.ready
-                            ? `${SysControl.cpuFreqAvgMhz} MHz · ${SysControl.cpuBoost ? "boost" : "no boost"}`
-                            : ""
                     }
 
                     StatTile {
                         Layout.fillWidth: true
                         icon: "videogame_asset"
                         label: qsTr("GPU")
+                        sub: SysControl.ready ? `${SysControl.gpuUsagePct}% · ${SysControl.gpuVOffsetMv} mV offset` : ""
                         value: SysControl.ready ? `${SysControl.gpuPowerW} / ${SysControl.gpuPowerCapW} W` : "—"
-                        sub: SysControl.ready
-                            ? `${SysControl.gpuUsagePct}% · ${SysControl.gpuVOffsetMv} mV offset`
-                            : ""
                     }
 
                     StatTile {
                         Layout.fillWidth: true
-                        visible: SysControl.room !== null
                         icon: "thermostat"
                         label: qsTr("Room")
-                        value: SysControl.room
-                            ? `${SysControl.room.temp_f.toFixed(1)}°F`
-                            : "—"
-                        sub: SysControl.room
-                            ? `${SysControl.room.humidity}% RH · ${SysControl.room.stale_s}s ago`
-                            : ""
+                        sub: SysControl.room ? `${SysControl.room.humidity}% RH · ${SysControl.room.stale_s}s ago` : ""
+                        value: SysControl.room ? `${SysControl.room.temp_f.toFixed(1)}°F` : "—"
+                        visible: SysControl.room !== null
                     }
                 }
             }
@@ -450,42 +558,49 @@ Item {
             icon: "terminal"
             text: qsTr("Open pp-status")
             type: IconTextButton.Tonal
+
             onClicked: Quickshell.execDetached(["ghostty", "-e", "pp-status"])
         }
 
-        Item { Layout.fillHeight: true }
+        Item {
+            Layout.fillHeight: true
+        }
     }
 
     component StatTile: ColumnLayout {
         property string icon
         property string label
-        property string value
         property string sub
+        property string value
 
         spacing: 2
 
         RowLayout {
             spacing: Tokens.spacing.small
+
             MaterialIcon {
+                color: Colours.palette.m3onSurfaceVariant
+                fontStyle: Tokens.font.icon.medium
                 text: icon
-                color: Colours.palette.m3onSurfaceVariant
-                font.pointSize: Tokens.font.size.normal
             }
+
             StyledText {
-                text: label
-                font.pointSize: Tokens.font.size.smaller
                 color: Colours.palette.m3onSurfaceVariant
+                font: Tokens.font.body.small
+                text: label
             }
         }
+
         StyledText {
-            text: value
-            font.pointSize: Tokens.font.size.large
             color: Colours.palette.m3onSurface
+            font: Tokens.font.body.large
+            text: value
         }
+
         StyledText {
-            text: sub
-            font.pointSize: Tokens.font.size.smaller
             color: Colours.palette.m3onSurfaceVariant
+            font: Tokens.font.body.small
+            text: sub
             visible: text.length > 0
         }
     }

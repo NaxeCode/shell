@@ -4,18 +4,12 @@ import ".."
 import QtQuick
 import Quickshell
 import Caelestia.Config
+import Caelestia.Services
 import qs.services
 import qs.utils
 
 Searcher {
     id: root
-
-    function transformSearch(search: string): string {
-        return search.slice(GlobalConfig.launcher.actionPrefix.length);
-    }
-
-    list: variants.instances
-    useFuzzy: GlobalConfig.launcher.useFuzzy.actions
 
     readonly property list<string> normalLauncherActions: ["Shutdown", "Reboot", "Logout", "Lock", "Sleep"]
 
@@ -27,12 +21,20 @@ Searcher {
         return allVariants.instances.filter(a => normalLauncherActions.includes(a.name) && (`${a.name} ${a.desc}`.toLowerCase().includes(query)));
     }
 
+    function transformSearch(search: string): string {
+        return search.slice(GlobalConfig.launcher.actionPrefix.length);
+    }
+
+    list: variants.instances
+    useFuzzy: GlobalConfig.launcher.useFuzzy.actions
+
     Variants {
         id: variants
 
         model: GlobalConfig.launcher.actions.filter(a => (a.enabled ?? true) && (GlobalConfig.launcher.enableDangerousActions || !(a.dangerous ?? false)))
 
-        Action {}
+        Action {
+        }
     }
 
     Variants {
@@ -40,18 +42,19 @@ Searcher {
 
         model: GlobalConfig.launcher.actions.filter(a => a.enabled ?? true)
 
-        Action {}
+        Action {
+        }
     }
 
     component Action: QtObject {
-        required property var modelData
-        readonly property string launcherType: "action"
-        readonly property string name: modelData.name ?? qsTr("Unnamed")
-        readonly property string desc: modelData.description ?? qsTr("No description")
-        readonly property string icon: modelData.icon ?? "help_outline"
         readonly property list<string> command: modelData.command ?? []
-        readonly property bool enabled: modelData.enabled ?? true
         readonly property bool dangerous: modelData.dangerous ?? false
+        readonly property string desc: modelData.description ?? qsTr("No description")
+        readonly property bool enabled: modelData.enabled ?? true
+        readonly property string icon: modelData.icon ?? "help_outline"
+        readonly property string launcherType: "action"
+        required property var modelData
+        readonly property string name: modelData.name ?? qsTr("Unnamed")
 
         function onClicked(list: AppList): void {
             if (command.length === 0)
@@ -60,11 +63,12 @@ Searcher {
             if (command[0] === "autocomplete" && command.length > 1) {
                 list.search.text = `${GlobalConfig.launcher.actionPrefix}${command[1]} `;
             } else if (command[0] === "setMode" && command.length > 1) {
-                list.visibilities.launcher = false;
+                list.screenState.launcher = false;
                 Colours.setMode(command[1]);
             } else {
-                list.visibilities.launcher = false;
-                Quickshell.execDetached(command);
+                list.screenState.launcher = false;
+                if (!SessionManager.exec(command))
+                    Quickshell.execDetached(command);
             }
         }
     }

@@ -1,23 +1,22 @@
 qml_module(caelestia-config
     URI Caelestia.Config
     SOURCES
-        config.cpp
+        common.cpp
+        rootnodes.cpp
         configattached.cpp
-        configobject.cpp
-        rootconfig.cpp
         appearanceconfig.cpp
-        tokens.cpp
+        font.cpp
+        fontbuilder.cpp
         tokensattached.cpp
         anim.cpp
-        monitorconfigmanager.cpp
         backgroundconfig.hpp
         barconfig.hpp
         borderconfig.hpp
-        controlcenterconfig.hpp
         dashboardconfig.hpp
         generalconfig.hpp
         launcherconfig.hpp
         lockconfig.hpp
+        nexusconfig.hpp
         notifsconfig.hpp
         osdconfig.hpp
         serviceconfig.hpp
@@ -25,8 +24,14 @@ qml_module(caelestia-config
         sidebarconfig.hpp
         userpaths.hpp
         utilitiesconfig.hpp
-        winfoconfig.hpp
+        tokens.hpp
     LIBRARIES
         Qt::Quick
         Qt::QuickControls2
+    DEPENDENCIES
+        Caelestia.Settings
+)
+target_link_libraries(caelestia-config PUBLIC
+    Qt::Gui
+    caelestia-settings
 )

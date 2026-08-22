@@ -16,6 +16,7 @@ Variants {
     StyledWindow {
         id: win
 
+        readonly property bool hasHz: mon && mon.liveHz !== null && mon.liveHz !== undefined
         required property ShellScreen modelData
         readonly property var mon: {
             for (const m of MonitorHz.monitors) {
@@ -24,52 +25,46 @@ Variants {
             }
             return null;
         }
-        readonly property bool hasHz: mon && mon.liveHz !== null && mon.liveHz !== undefined
 
-        screen: modelData
-        name: "live-hz-overlay"
         WlrLayershell.exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        WlrLayershell.layer: WlrLayer.Overlay
+        anchors.bottom: true
+        anchors.left: true
+        anchors.right: true
+        anchors.top: true
+        color: "transparent"
         // Empty input mask: show the overlay but pass mouse wheel/clicks through
         // to apps/Zellij underneath. Full-screen overlay otherwise eats scroll.
         mask: emptyMask
+        name: "live-hz-overlay"
+        screen: modelData
 
         Region {
             id: emptyMask
         }
 
-        anchors.top: true
-        anchors.bottom: true
-        anchors.left: true
-        anchors.right: true
-        color: "transparent"
-
         StyledRect {
             anchors.left: parent.left
+            anchors.leftMargin: Config.bar.excludedScreens.includes(win.modelData.name) ? 18 : Tokens.padding.large * 2 + Tokens.sizes.bar.innerWidth + Math.max(Tokens.padding.extraSmall, Config.border.thickness)
             anchors.top: parent.top
-            anchors.leftMargin: Config.bar.excludedScreens.includes(win.modelData.name)
-                ? 18
-                : Tokens.padding.large * 2 + Tokens.sizes.bar.innerWidth + Math.max(Tokens.padding.smaller, Config.border.thickness)
             anchors.topMargin: 18
-
-            visible: true
-            opacity: 0.86
-            radius: Tokens.rounding.normal
             color: Qt.alpha(Colours.tPalette.m3surfaceContainer, 0.78)
-            implicitWidth: label.implicitWidth + Tokens.padding.normal * 2
-            implicitHeight: label.implicitHeight + Tokens.padding.small * 2
-            width: implicitWidth
             height: implicitHeight
+            implicitHeight: label.implicitHeight + Tokens.padding.small * 2
+            implicitWidth: label.implicitWidth + Tokens.padding.medium * 2
+            opacity: 0.86
+            radius: Tokens.rounding.medium
+            visible: true
+            width: implicitWidth
 
             StyledText {
                 id: label
 
                 anchors.centerIn: parent
-                text: win.hasHz ? `${MonitorHz.fmtHz(win.mon.liveHz)} Hz` : `${win.modelData.name}\n— Hz`
-                font.pointSize: Tokens.font.size.smaller
-                font.family: Tokens.font.family.mono
                 color: Colours.palette.m3primary
+                font: Tokens.font.mono.small
+                text: win.hasHz ? `${MonitorHz.fmtHz(win.mon.liveHz)} Hz` : `${win.modelData.name}\n— Hz`
             }
         }
     }

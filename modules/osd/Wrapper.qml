@@ -10,12 +10,12 @@ Item {
     id: root
 
     required property ShellScreen screen
-    required property DrawerVisibilities visibilities
+    required property ScreenState screenState
     required property bool sidebarOrSessionVisible
 
     property bool hovered
-    readonly property var monitor: Brightness.getMonitorForScreen(root.screen)
-    readonly property bool shouldBeActive: visibilities.osd && Config.osd.enabled && !(visibilities.utilities && Config.utilities.enabled)
+    readonly property Brightness.Monitor monitor: Brightness.getMonitorForScreen(root.screen)
+    readonly property bool shouldBeActive: screenState.osd && Config.osd.enabled && !(screenState.utilities && Config.utilities.enabled)
     readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
     readonly property real hiddenOverscan: oledBlackout ? 32 : 5
     property real offsetScale: shouldBeActive ? 0 : 1
@@ -28,7 +28,7 @@ Item {
     property real brightness
 
     function show(): void {
-        visibilities.osd = true;
+        screenState.osd = true;
         timer.restart();
     }
 
@@ -47,9 +47,7 @@ Item {
     opacity: 1 - offsetScale
 
     Behavior on offsetScale {
-        Anim {
-            type: Anim.DefaultSpatial
-        }
+        Anim {}
     }
 
     Connections {
@@ -91,7 +89,7 @@ Item {
         interval: root.Config.osd.hideDelay
         onTriggered: {
             if (!root.hovered)
-                root.visibilities.osd = false;
+                root.screenState.osd = false;
         }
     }
 
@@ -106,7 +104,7 @@ Item {
 
         sourceComponent: Content {
             monitor: root.monitor
-            visibilities: root.visibilities
+            screenState: root.screenState
             volume: root.volume
             muted: root.muted
             sourceVolume: root.sourceVolume

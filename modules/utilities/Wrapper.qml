@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
+import Caelestia
 import Caelestia.Config
 import qs.components
 import qs.modules.sidebar as Sidebar
@@ -10,8 +11,7 @@ import qs.modules.bar.popouts as BarPopouts
 Item {
     id: root
 
-    required property var screen
-    required property DrawerVisibilities visibilities
+    required property ScreenState screenState
     required property Sidebar.Wrapper sidebar
     required property BarPopouts.Wrapper popouts
     property real horizontalStretch
@@ -24,21 +24,23 @@ Item {
 
         reloadableId: "utilities"
     }
-    readonly property bool shouldBeActive: visibilities.sidebar || (visibilities.utilities && Config.utilities.enabled && !(visibilities.session && Config.session.enabled))
-    readonly property bool oledBlackout: !GlobalConfig.forScreen(screen.name).enabled
+    readonly property bool shouldBeActive: screenState.sidebar || (screenState.utilities && Config.utilities.enabled && !(screenState.session && Config.session.enabled))
+    readonly property bool oledBlackout: !GlobalConfig.forScreen(screenState.modelData.name).enabled
     readonly property real hiddenOverscan: oledBlackout ? 32 : 5
+    readonly property real totalPadding: content.anchors.margins + CUtils.clamp(content.anchors.margins - Config.border.thickness, 0, content.anchors.margins)
+    readonly property real nonAnimHeight: ((content.item as Content)?.nonAnimHeight ?? 0) + totalPadding
     property real offsetScale: shouldBeActive ? 0 : 1
     property real sidebarLerp
 
     visible: oledBlackout ? (shouldBeActive || offsetScale < 0.99) : offsetScale < 1
     anchors.bottomMargin: (-implicitHeight - hiddenOverscan) * offsetScale
-    implicitHeight: content.implicitHeight + content.anchors.margins * 2
+    implicitHeight: content.implicitHeight + totalPadding
     implicitWidth: sidebar.width * (1 - sidebar.offsetScale) * horizontalStretch * sidebarLerp + Tokens.sizes.utilities.width * (1 - sidebarLerp)
     opacity: 1 - offsetScale
 
     states: State {
         name: "attachedToSidebar"
-        when: root.visibilities.sidebar
+        when: root.screenState.sidebar
 
         PropertyChanges {
             root.sidebarLerp: 1
@@ -67,9 +69,7 @@ Item {
     ]
 
     Behavior on offsetScale {
-        Anim {
-            type: Anim.DefaultSpatial
-        }
+        Anim {}
     }
 
     Loader {
@@ -83,9 +83,9 @@ Item {
         active: root.shouldBeActive || root.visible
 
         sourceComponent: Content {
-            implicitWidth: root.implicitWidth - content.anchors.margins * 2
+            implicitWidth: root.implicitWidth - root.totalPadding
             props: root.props
-            visibilities: root.visibilities
+            screenState: root.screenState
             popouts: root.popouts
             deformMatrix: root.deformMatrix
         }

@@ -14,248 +14,140 @@ import qs.utils
 Item {
     id: root
 
-    readonly property int minWidth: 500
-    implicitWidth: Math.max(minWidth, flickable.contentItem.childrenRect.width + Tokens.padding.large * 2)
-    implicitHeight: Math.min(flickable.contentHeight + Tokens.padding.large * 2, 900)
+    property bool _loaded: false
+    property string effectsConfigErrors: ""
+    property string effectsStatus: ""
+    readonly property string effectsTool: `${Paths.home}/.local/bin/hypr-effects`
+    property bool ghosttyBlur: ghosttyDefaults.blur
+    readonly property var ghosttyDefaults: ({
+            opacity: 0.85,
+            blur: true
+        })
+    property real ghosttyOpacity: ghosttyDefaults.opacity
+    readonly property string ghosttyPath: `${Paths.home}/.config/ghostty/config`
+    property string ghosttyPreset: "glass"
+    property int hgBlurIterations: hgDefaults.blur_iterations
+    property real hgBlurStrength: hgDefaults.blur_strength
+    property real hgChromaticAberration: hgDefaults.chromatic_aberration
 
     // ── HyprGlass defaults (current hyprland.conf values) ──
     readonly property var hgDefaults: ({
-        enabled: true,
-        blur_strength: 6.0,
-        blur_iterations: 3,
-        refraction_strength: 0.9,
-        chromatic_aberration: 0.7,
-        fresnel_strength: 0.5,
-        specular_strength: 0.5,
-        edge_thickness: 0.08,
-        lens_distortion: 0.6,
-        vibrancy: 0.15,
-        vibrancy_darkness: 0.0,
-        layers_enabled: true
-    })
-
-    readonly property var nativeBlurDefaults: ({
-        enabled: true,
-        size: 8,
-        passes: 2
-    })
-
-    readonly property var trDefaults: ({
-        enabled: true,
-        base: 0.85,
-        layers: 0.4
-    })
-
-    readonly property var ghosttyDefaults: ({
-        opacity: 0.85,
-        blur: true
-    })
-
-    readonly property string ghosttyPath: `${Paths.home}/.config/ghostty/config`
-    readonly property string effectsTool: `${Paths.home}/.local/bin/hypr-effects`
-
-    property string ghosttyPreset: "glass"
-    property bool hgPluginLoaded: false
-    property bool hgHyprpmEnabled: false
-    property string effectsStatus: ""
-    property string effectsConfigErrors: ""
+            enabled: true,
+            blur_strength: 6.0,
+            blur_iterations: 3,
+            refraction_strength: 0.9,
+            chromatic_aberration: 0.7,
+            fresnel_strength: 0.5,
+            specular_strength: 0.5,
+            edge_thickness: 0.08,
+            lens_distortion: 0.6,
+            vibrancy: 0.15,
+            vibrancy_darkness: 0.0,
+            layers_enabled: true
+        })
+    property real hgEdgeThickness: hgDefaults.edge_thickness
 
     // ── HyprGlass mutable state ──
     property bool hgEnabled: hgDefaults.enabled
-    property real hgBlurStrength: hgDefaults.blur_strength
-    property int hgBlurIterations: hgDefaults.blur_iterations
-    property real hgRefractionStrength: hgDefaults.refraction_strength
-    property real hgChromaticAberration: hgDefaults.chromatic_aberration
     property real hgFresnelStrength: hgDefaults.fresnel_strength
-    property real hgSpecularStrength: hgDefaults.specular_strength
-    property real hgEdgeThickness: hgDefaults.edge_thickness
+    property bool hgHyprpmEnabled: false
+    property bool hgLayersEnabled: hgDefaults.layers_enabled
     property real hgLensDistortion: hgDefaults.lens_distortion
+    property bool hgPluginLoaded: false
+    property real hgRefractionStrength: hgDefaults.refraction_strength
+    property real hgSpecularStrength: hgDefaults.specular_strength
     property real hgVibrancy: hgDefaults.vibrancy
     property real hgVibrancyDarkness: hgDefaults.vibrancy_darkness
-    property bool hgLayersEnabled: hgDefaults.layers_enabled
-
+    readonly property int minWidth: 500
+    readonly property var nativeBlurDefaults: ({
+            enabled: true,
+            size: 8,
+            passes: 2
+        })
     property bool nativeBlurEnabled: nativeBlurDefaults.enabled
-    property int nativeBlurSize: nativeBlurDefaults.size
     property int nativeBlurPasses: nativeBlurDefaults.passes
+    property int nativeBlurSize: nativeBlurDefaults.size
+    readonly property var trDefaults: ({
+            enabled: true,
+            base: 0.85,
+            layers: 0.4
+        })
 
-    property real ghosttyOpacity: ghosttyDefaults.opacity
-    property bool ghosttyBlur: ghosttyDefaults.blur
+    function applyAllHg(): void {
+        Hypr.extras.batchMessage([`keyword plugin:hyprglass:enabled ${hgEnabled ? 1 : 0}`, `keyword plugin:hyprglass:blur_strength ${hgBlurStrength}`, `keyword plugin:hyprglass:blur_iterations ${hgBlurIterations}`, `keyword plugin:hyprglass:refraction_strength ${hgRefractionStrength}`, `keyword plugin:hyprglass:chromatic_aberration ${hgChromaticAberration}`, `keyword plugin:hyprglass:fresnel_strength ${hgFresnelStrength}`, `keyword plugin:hyprglass:specular_strength ${hgSpecularStrength}`, `keyword plugin:hyprglass:edge_thickness ${hgEdgeThickness}`, `keyword plugin:hyprglass:lens_distortion ${hgLensDistortion}`, `keyword plugin:hyprglass:vibrancy ${hgVibrancy}`, `keyword plugin:hyprglass:vibrancy_darkness ${hgVibrancyDarkness}`,]);
+    }
 
-    property bool _loaded: false
+    function applyAllNativeBlur(): void {
+        Hypr.extras.batchMessage([`keyword decoration:blur:enabled ${nativeBlurEnabled ? 1 : 0}`, `keyword decoration:blur:size ${nativeBlurSize}`, `keyword decoration:blur:passes ${nativeBlurPasses}`, "keyword decoration:blur:ignore_opacity 1", "keyword decoration:blur:new_optimizations 1",]);
+    }
 
     function applyHg(key: string, value): void {
         Hypr.extras.batchMessage([`keyword plugin:hyprglass:${key} ${value}`]);
     }
 
-    function applyNativeBlur(key: string, value): void {
-        Hypr.extras.batchMessage([`keyword decoration:blur:${key} ${value}`]);
-    }
-
-    function applyAllNativeBlur(): void {
-        Hypr.extras.batchMessage([
-            `keyword decoration:blur:enabled ${nativeBlurEnabled ? 1 : 0}`,
-            `keyword decoration:blur:size ${nativeBlurSize}`,
-            `keyword decoration:blur:passes ${nativeBlurPasses}`,
-            "keyword decoration:blur:ignore_opacity 1",
-            "keyword decoration:blur:new_optimizations 1",
-        ]);
-    }
-
     function applyHgLayers(): void {
-        Hypr.extras.batchMessage([
-            `keyword plugin:hyprglass:layers:enabled ${hgLayersEnabled ? 1 : 0}`,
-            "keyword plugin:hyprglass:layers:namespaces caelestia-drawers",
-            "keyword plugin:hyprglass:layers:preset subtle",
-            "keyword plugin:hyprglass:layers:namespace_mask_thresholds caelestia-drawers=0.1",
-        ]);
-    }
-
-    function applyAllHg(): void {
-        Hypr.extras.batchMessage([
-            `keyword plugin:hyprglass:enabled ${hgEnabled ? 1 : 0}`,
-            `keyword plugin:hyprglass:blur_strength ${hgBlurStrength}`,
-            `keyword plugin:hyprglass:blur_iterations ${hgBlurIterations}`,
-            `keyword plugin:hyprglass:refraction_strength ${hgRefractionStrength}`,
-            `keyword plugin:hyprglass:chromatic_aberration ${hgChromaticAberration}`,
-            `keyword plugin:hyprglass:fresnel_strength ${hgFresnelStrength}`,
-            `keyword plugin:hyprglass:specular_strength ${hgSpecularStrength}`,
-            `keyword plugin:hyprglass:edge_thickness ${hgEdgeThickness}`,
-            `keyword plugin:hyprglass:lens_distortion ${hgLensDistortion}`,
-            `keyword plugin:hyprglass:vibrancy ${hgVibrancy}`,
-            `keyword plugin:hyprglass:vibrancy_darkness ${hgVibrancyDarkness}`,
-        ]);
-    }
-
-    function save(): void {
-        if (!_loaded) return;
-        const data = {
-            enabled: hgEnabled,
-            blur_strength: hgBlurStrength,
-            blur_iterations: hgBlurIterations,
-            refraction_strength: hgRefractionStrength,
-            chromatic_aberration: hgChromaticAberration,
-            fresnel_strength: hgFresnelStrength,
-            specular_strength: hgSpecularStrength,
-            edge_thickness: hgEdgeThickness,
-            lens_distortion: hgLensDistortion,
-            vibrancy: hgVibrancy,
-            vibrancy_darkness: hgVibrancyDarkness,
-            layers_enabled: hgLayersEnabled,
-            native_blur_enabled: nativeBlurEnabled,
-            native_blur_size: nativeBlurSize,
-            native_blur_passes: nativeBlurPasses,
-            ghostty_preset: ghosttyPreset,
-        };
-        jsonFile.setText(JSON.stringify(data, null, 2) + "\n");
-
-        const conf = [
-            "decoration {",
-            "    blur {",
-            `        enabled = ${nativeBlurEnabled ? 1 : 0}`,
-            `        size = ${nativeBlurSize}`,
-            `        passes = ${nativeBlurPasses}`,
-            "        ignore_opacity = 1",
-            "        new_optimizations = 1",
-            "    }",
-            "}",
-            "",
-            "plugin {",
-            "    hyprglass {",
-            `        enabled = ${hgEnabled ? 1 : 0}`,
-            `        blur_strength = ${hgBlurStrength}`,
-            `        blur_iterations = ${hgBlurIterations}`,
-            `        refraction_strength = ${hgRefractionStrength}`,
-            `        chromatic_aberration = ${hgChromaticAberration}`,
-            `        fresnel_strength = ${hgFresnelStrength}`,
-            `        specular_strength = ${hgSpecularStrength}`,
-            `        edge_thickness = ${hgEdgeThickness}`,
-            `        lens_distortion = ${hgLensDistortion}`,
-            `        vibrancy = ${hgVibrancy}`,
-            `        vibrancy_darkness = ${hgVibrancyDarkness}`,
-            "",
-            "        layers {",
-            `            enabled = ${hgLayersEnabled ? 1 : 0}`,
-            "            namespaces = caelestia-drawers",
-            "            preset = subtle",
-            "            namespace_mask_thresholds = caelestia-drawers=0.1",
-            "        }",
-            "    }",
-            "}",
-        ].join("\n") + "\n";
-        confFile.setText(conf);
-    }
-
-    function hgChange(key: string, value): void {
-        applyHg(key, value);
-        saveDebounce.restart();
-    }
-
-    function loadGhosttyConfig(text: string): void {
-        const opMatch = text.match(/^background-opacity\s*=\s*([\d.]+)/m);
-        if (opMatch) ghosttyOpacity = parseFloat(opMatch[1]);
-        const blurMatch = text.match(/^background-blur\s*=\s*(\w+)/m);
-        if (blurMatch) ghosttyBlur = blurMatch[1] === "true";
-    }
-
-    function saveGhostty(): void {
-        Quickshell.execDetached(["sh", "-c",
-            `sed -i -E -e 's/^background-opacity\\s*=.*/background-opacity = ${ghosttyOpacity}/' ` +
-            `-e 's/^background-blur\\s*=.*/background-blur = ${ghosttyBlur}/' ` +
-            `'${ghosttyPath}' && ` +
-            `gdbus call --session --dest com.mitchellh.ghostty ` +
-            `--object-path /com/mitchellh/ghostty ` +
-            `--method org.gtk.Actions.Activate reload-config '[]' '{}'`]);
-    }
-
-    function setGhosttyPreset(preset: string): void {
-        ghosttyPreset = preset;
-        Quickshell.execDetached([effectsTool, "set-ghostty-preset", preset]);
-        liveRefreshDebounce.restart();
-    }
-
-    function refreshLive(): void {
-        if (!liveStateProc.running)
-            liveStateProc.running = true;
-    }
-
-    function reloadHyprGlassPlugin(): void {
-        Quickshell.execDetached([effectsTool, "reload-plugin"]);
-        liveRefreshDebounce.restart();
+        Hypr.extras.batchMessage([`keyword plugin:hyprglass:layers:enabled ${hgLayersEnabled ? 1 : 0}`, "keyword plugin:hyprglass:layers:namespaces caelestia-drawers", "keyword plugin:hyprglass:layers:preset subtle", "keyword plugin:hyprglass:layers:namespace_mask_thresholds caelestia-drawers=0.1",]);
     }
 
     function applyLiveState(text: string): void {
         try {
             const data = JSON.parse(text);
             const blur = data.native_blur ?? {};
-            if (blur.enabled !== null && blur.enabled !== undefined) nativeBlurEnabled = blur.enabled;
-            if (blur.size !== null && blur.size !== undefined) nativeBlurSize = blur.size;
-            if (blur.passes !== null && blur.passes !== undefined) nativeBlurPasses = blur.passes;
+            if (blur.enabled !== null && blur.enabled !== undefined)
+                nativeBlurEnabled = blur.enabled;
+            if (blur.size !== null && blur.size !== undefined)
+                nativeBlurSize = blur.size;
+            if (blur.passes !== null && blur.passes !== undefined)
+                nativeBlurPasses = blur.passes;
 
             const hg = data.hyprglass ?? {};
-            if (hg.enabled !== null && hg.enabled !== undefined) hgEnabled = hg.enabled;
-            if (hg.blur_strength !== null && hg.blur_strength !== undefined) hgBlurStrength = hg.blur_strength;
-            if (hg.blur_iterations !== null && hg.blur_iterations !== undefined) hgBlurIterations = hg.blur_iterations;
-            if (hg.refraction_strength !== null && hg.refraction_strength !== undefined) hgRefractionStrength = hg.refraction_strength;
-            if (hg.chromatic_aberration !== null && hg.chromatic_aberration !== undefined) hgChromaticAberration = hg.chromatic_aberration;
-            if (hg.fresnel_strength !== null && hg.fresnel_strength !== undefined) hgFresnelStrength = hg.fresnel_strength;
-            if (hg.specular_strength !== null && hg.specular_strength !== undefined) hgSpecularStrength = hg.specular_strength;
-            if (hg.edge_thickness !== null && hg.edge_thickness !== undefined) hgEdgeThickness = hg.edge_thickness;
-            if (hg.lens_distortion !== null && hg.lens_distortion !== undefined) hgLensDistortion = hg.lens_distortion;
-            if (hg.vibrancy !== null && hg.vibrancy !== undefined) hgVibrancy = hg.vibrancy;
-            if (hg.vibrancy_darkness !== null && hg.vibrancy_darkness !== undefined) hgVibrancyDarkness = hg.vibrancy_darkness;
-            if (hg.layers_enabled !== null && hg.layers_enabled !== undefined) hgLayersEnabled = hg.layers_enabled;
+            if (hg.enabled !== null && hg.enabled !== undefined)
+                hgEnabled = hg.enabled;
+            if (hg.blur_strength !== null && hg.blur_strength !== undefined)
+                hgBlurStrength = hg.blur_strength;
+            if (hg.blur_iterations !== null && hg.blur_iterations !== undefined)
+                hgBlurIterations = hg.blur_iterations;
+            if (hg.refraction_strength !== null && hg.refraction_strength !== undefined)
+                hgRefractionStrength = hg.refraction_strength;
+            if (hg.chromatic_aberration !== null && hg.chromatic_aberration !== undefined)
+                hgChromaticAberration = hg.chromatic_aberration;
+            if (hg.fresnel_strength !== null && hg.fresnel_strength !== undefined)
+                hgFresnelStrength = hg.fresnel_strength;
+            if (hg.specular_strength !== null && hg.specular_strength !== undefined)
+                hgSpecularStrength = hg.specular_strength;
+            if (hg.edge_thickness !== null && hg.edge_thickness !== undefined)
+                hgEdgeThickness = hg.edge_thickness;
+            if (hg.lens_distortion !== null && hg.lens_distortion !== undefined)
+                hgLensDistortion = hg.lens_distortion;
+            if (hg.vibrancy !== null && hg.vibrancy !== undefined)
+                hgVibrancy = hg.vibrancy;
+            if (hg.vibrancy_darkness !== null && hg.vibrancy_darkness !== undefined)
+                hgVibrancyDarkness = hg.vibrancy_darkness;
+            if (hg.layers_enabled !== null && hg.layers_enabled !== undefined)
+                hgLayersEnabled = hg.layers_enabled;
             hgPluginLoaded = hg.loaded ?? false;
             hgHyprpmEnabled = hg.hyprpm_enabled ?? false;
 
             const ghostty = data.ghostty ?? {};
-            if (ghostty.opacity !== null && ghostty.opacity !== undefined) ghosttyOpacity = ghostty.opacity;
-            if (ghostty.blur !== null && ghostty.blur !== undefined) ghosttyBlur = ghostty.blur;
+            if (ghostty.opacity !== null && ghostty.opacity !== undefined)
+                ghosttyOpacity = ghostty.opacity;
+            if (ghostty.blur !== null && ghostty.blur !== undefined)
+                ghosttyBlur = ghostty.blur;
             ghosttyPreset = data.rules?.ghostty_preset ?? ghosttyPreset;
             effectsConfigErrors = data.config_errors ?? "";
             effectsStatus = qsTr("Live state refreshed");
         } catch (e) {
             effectsStatus = qsTr("Live readback failed: %1").arg(e);
         }
+    }
+
+    function applyNativeBlur(key: string, value): void {
+        Hypr.extras.batchMessage([`keyword decoration:blur:${key} ${value}`]);
+    }
+
+    function hgChange(key: string, value): void {
+        applyHg(key, value);
+        saveDebounce.restart();
     }
 
     function loadFromJson(text: string): void {
@@ -281,6 +173,25 @@ Item {
             console.warn("EffectsTab: JSON parse failed, using defaults");
         }
         _loaded = true;
+    }
+
+    function loadGhosttyConfig(text: string): void {
+        const opMatch = text.match(/^background-opacity\s*=\s*([\d.]+)/m);
+        if (opMatch)
+            ghosttyOpacity = parseFloat(opMatch[1]);
+        const blurMatch = text.match(/^background-blur\s*=\s*(\w+)/m);
+        if (blurMatch)
+            ghosttyBlur = blurMatch[1] === "true";
+    }
+
+    function refreshLive(): void {
+        if (!liveStateProc.running)
+            liveStateProc.running = true;
+    }
+
+    function reloadHyprGlassPlugin(): void {
+        Quickshell.execDetached([effectsTool, "reload-plugin"]);
+        liveRefreshDebounce.restart();
     }
 
     function resetToDefaults(): void {
@@ -317,16 +228,59 @@ Item {
         setGhosttyPreset(ghosttyPreset);
     }
 
+    function save(): void {
+        if (!_loaded)
+            return;
+        const data = {
+            enabled: hgEnabled,
+            blur_strength: hgBlurStrength,
+            blur_iterations: hgBlurIterations,
+            refraction_strength: hgRefractionStrength,
+            chromatic_aberration: hgChromaticAberration,
+            fresnel_strength: hgFresnelStrength,
+            specular_strength: hgSpecularStrength,
+            edge_thickness: hgEdgeThickness,
+            lens_distortion: hgLensDistortion,
+            vibrancy: hgVibrancy,
+            vibrancy_darkness: hgVibrancyDarkness,
+            layers_enabled: hgLayersEnabled,
+            native_blur_enabled: nativeBlurEnabled,
+            native_blur_size: nativeBlurSize,
+            native_blur_passes: nativeBlurPasses,
+            ghostty_preset: ghosttyPreset
+        };
+        jsonFile.setText(JSON.stringify(data, null, 2) + "\n");
+
+        const conf = ["decoration {", "    blur {", `        enabled = ${nativeBlurEnabled ? 1 : 0}`, `        size = ${nativeBlurSize}`, `        passes = ${nativeBlurPasses}`, "        ignore_opacity = 1", "        new_optimizations = 1", "    }", "}", "", "plugin {", "    hyprglass {", `        enabled = ${hgEnabled ? 1 : 0}`, `        blur_strength = ${hgBlurStrength}`, `        blur_iterations = ${hgBlurIterations}`, `        refraction_strength = ${hgRefractionStrength}`, `        chromatic_aberration = ${hgChromaticAberration}`, `        fresnel_strength = ${hgFresnelStrength}`, `        specular_strength = ${hgSpecularStrength}`, `        edge_thickness = ${hgEdgeThickness}`, `        lens_distortion = ${hgLensDistortion}`, `        vibrancy = ${hgVibrancy}`, `        vibrancy_darkness = ${hgVibrancyDarkness}`, "", "        layers {", `            enabled = ${hgLayersEnabled ? 1 : 0}`, "            namespaces = caelestia-drawers", "            preset = subtle", "            namespace_mask_thresholds = caelestia-drawers=0.1", "        }", "    }", "}",].join("\n") + "\n";
+        confFile.setText(conf);
+    }
+
+    function saveGhostty(): void {
+        Quickshell.execDetached(["sh", "-c", `sed -i -E -e 's/^background-opacity\\s*=.*/background-opacity = ${ghosttyOpacity}/' ` + `-e 's/^background-blur\\s*=.*/background-blur = ${ghosttyBlur}/' ` + `'${ghosttyPath}' && ` + `gdbus call --session --dest com.mitchellh.ghostty ` + `--object-path /com/mitchellh/ghostty ` + `--method org.gtk.Actions.Activate reload-config '[]' '{}'`]);
+    }
+
+    function setGhosttyPreset(preset: string): void {
+        ghosttyPreset = preset;
+        Quickshell.execDetached([effectsTool, "set-ghostty-preset", preset]);
+        liveRefreshDebounce.restart();
+    }
+
+    implicitHeight: Math.min(flickable.contentHeight + Tokens.padding.large * 2, 900)
+    implicitWidth: Math.max(minWidth, flickable.contentItem.childrenRect.width + Tokens.padding.large * 2)
+
+    Component.onCompleted: root.refreshLive()
+
     FileView {
         id: jsonFile
 
         path: `${Paths.config}/effects.json`
         printErrors: false
-        onLoaded: root.loadFromJson(text())
+
         onLoadFailed: {
             root._loaded = true;
             root.save();
         }
+        onLoaded: root.loadFromJson(text())
     }
 
     FileView {
@@ -341,6 +295,7 @@ Item {
 
         path: root.ghosttyPath
         printErrors: false
+
         onLoaded: root.loadGhosttyConfig(text())
     }
 
@@ -359,6 +314,7 @@ Item {
         id: liveRefreshDebounce
 
         interval: 800
+
         onTriggered: root.refreshLive()
     }
 
@@ -370,12 +326,11 @@ Item {
         target: Hypr
     }
 
-    Component.onCompleted: root.refreshLive()
-
     Timer {
         id: saveDebounce
 
         interval: 200
+
         onTriggered: root.save()
     }
 
@@ -383,6 +338,7 @@ Item {
         id: ghosttyDebounce
 
         interval: 200
+
         onTriggered: root.saveGhostty()
     }
 
@@ -391,8 +347,8 @@ Item {
 
         anchors.fill: parent
         anchors.margins: Tokens.padding.large
-        flickableDirection: Flickable.VerticalFlick
         contentHeight: layout.implicitHeight
+        flickableDirection: Flickable.VerticalFlick
 
         StyledScrollBar.vertical: StyledScrollBar {
             flickable: flickable
@@ -403,23 +359,22 @@ Item {
 
             anchors.left: parent.left
             anchors.right: parent.right
-            spacing: Tokens.spacing.larger
+            spacing: Tokens.spacing.large
 
             // ── Header ────────────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
-                spacing: Tokens.spacing.normal
+                spacing: Tokens.spacing.medium
 
                 RowLayout {
                     spacing: Tokens.spacing.small
 
                     IconTextButton {
-                        icon: "auto_awesome"
-                        text: (Colours.transparency.enabled && root.nativeBlurEnabled && root.hgEnabled && root.hgLayersEnabled && root.ghosttyBlur)
-                            ? qsTr("All effects on")
-                            : qsTr("All effects off")
                         checked: Colours.transparency.enabled && root.nativeBlurEnabled && root.hgEnabled && root.hgLayersEnabled && root.ghosttyBlur
+                        icon: "auto_awesome"
+                        text: (Colours.transparency.enabled && root.nativeBlurEnabled && root.hgEnabled && root.hgLayersEnabled && root.ghosttyBlur) ? qsTr("All effects on") : qsTr("All effects off")
                         type: IconTextButton.Filled
+
                         onClicked: {
                             const enable = !(Colours.transparency.enabled && root.nativeBlurEnabled && root.hgEnabled && root.hgLayersEnabled && root.ghosttyBlur);
                             GlobalConfig.appearance.transparency.enabled = enable;
@@ -438,12 +393,15 @@ Item {
                     }
                 }
 
-                Item { Layout.fillWidth: true }
+                Item {
+                    Layout.fillWidth: true
+                }
 
                 IconTextButton {
                     icon: "sync"
                     text: qsTr("Read live")
                     type: IconTextButton.Tonal
+
                     onClicked: root.refreshLive()
                 }
 
@@ -451,6 +409,7 @@ Item {
                     icon: "extension"
                     text: qsTr("Reload HyprGlass")
                     type: IconTextButton.Tonal
+
                     onClicked: root.reloadHyprGlassPlugin()
                 }
 
@@ -458,6 +417,7 @@ Item {
                     icon: "restart_alt"
                     text: qsTr("Default")
                     type: IconTextButton.Tonal
+
                     onClicked: root.resetToDefaults()
                 }
             }
@@ -465,46 +425,41 @@ Item {
             // ── Live status ───────────────────────────────────────────────────
             StyledRect {
                 Layout.fillWidth: true
-                implicitHeight: liveStatus.implicitHeight + Tokens.padding.normal * 2
-                radius: Tokens.rounding.normal
-                color: (!root.hgPluginLoaded || root.effectsConfigErrors.length > 0)
-                    ? Qt.alpha(Colours.palette.m3errorContainer, 0.7)
-                    : Colours.tPalette.m3surfaceContainer
+                color: (!root.hgPluginLoaded || root.effectsConfigErrors.length > 0) ? Qt.alpha(Colours.palette.m3errorContainer, 0.7) : Colours.tPalette.m3surfaceContainer
+                implicitHeight: liveStatus.implicitHeight + Tokens.padding.medium * 2
+                radius: Tokens.rounding.medium
 
                 ColumnLayout {
                     id: liveStatus
 
                     anchors.left: parent.left
+                    anchors.margins: Tokens.padding.medium
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.margins: Tokens.padding.normal
-                    spacing: Tokens.spacing.smaller
+                    spacing: Tokens.spacing.extraSmall
 
                     StyledText {
                         Layout.fillWidth: true
-                        text: qsTr("Live readback: native blur %1 · Ghostty preset %2 · HyprGlass plugin %3")
-                            .arg(root.nativeBlurEnabled ? qsTr("on") : qsTr("off"))
-                            .arg(root.ghosttyPreset)
-                            .arg(root.hgPluginLoaded ? qsTr("loaded") : (root.hgHyprpmEnabled ? qsTr("enabled but not loaded") : qsTr("not enabled")))
                         color: Colours.palette.m3onSurface
+                        text: qsTr("Live readback: native blur %1 · Ghostty preset %2 · HyprGlass plugin %3").arg(root.nativeBlurEnabled ? qsTr("on") : qsTr("off")).arg(root.ghosttyPreset).arg(root.hgPluginLoaded ? qsTr("loaded") : (root.hgHyprpmEnabled ? qsTr("enabled but not loaded") : qsTr("not enabled")))
                         wrapMode: Text.WordWrap
                     }
 
                     StyledText {
                         Layout.fillWidth: true
-                        visible: root.effectsStatus.length > 0
-                        text: root.effectsStatus
                         color: Colours.palette.m3onSurfaceVariant
-                        font.pointSize: Tokens.font.size.smaller
+                        font: Tokens.font.body.small
+                        text: root.effectsStatus
+                        visible: root.effectsStatus.length > 0
                         wrapMode: Text.WordWrap
                     }
 
                     StyledText {
                         Layout.fillWidth: true
-                        visible: root.effectsConfigErrors.length > 0
-                        text: root.effectsConfigErrors
                         color: Colours.palette.m3error
-                        font.pointSize: Tokens.font.size.smaller
+                        font: Tokens.font.body.small
+                        text: root.effectsConfigErrors
+                        visible: root.effectsConfigErrors.length > 0
                         wrapMode: Text.WordWrap
                     }
                 }
@@ -516,14 +471,15 @@ Item {
                 spacing: Tokens.spacing.small
 
                 StyledText {
-                    text: qsTr("Transparency")
-                    font.pointSize: Tokens.font.size.normal
                     color: Colours.palette.m3onSurfaceVariant
+                    font: Tokens.font.body.medium
+                    text: qsTr("Transparency")
                 }
 
-                SwitchRow {
-                    label: qsTr("Enabled")
+                EffectSwitch {
                     checked: Colours.transparency.enabled
+                    label: qsTr("Enabled")
+
                     onToggled: checked => {
                         GlobalConfig.appearance.transparency.enabled = checked;
                     }
@@ -531,37 +487,45 @@ Item {
 
                 StyledRect {
                     Layout.fillWidth: true
-                    implicitHeight: trSliders.implicitHeight + Tokens.padding.normal * 2
-                    radius: Tokens.rounding.normal
                     color: Colours.tPalette.m3surfaceContainer
+                    implicitHeight: trSliders.implicitHeight + Tokens.padding.medium * 2
                     opacity: Colours.transparency.enabled ? 1.0 : 0.5
+                    radius: Tokens.rounding.medium
 
                     ColumnLayout {
                         id: trSliders
 
                         anchors.left: parent.left
+                        anchors.margins: Tokens.padding.medium
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: Tokens.padding.normal
-                        spacing: Tokens.spacing.normal
+                        spacing: Tokens.spacing.medium
 
                         EffectSlider {
-                            label: qsTr("Base opacity")
-                            value: (GlobalConfig.appearance.transparency.base ?? 0.85) * 100
-                            from: 0; to: 100; stepSize: 1; decimals: 0
-                            suffix: "%"
+                            decimals: 0
                             enabled: Colours.transparency.enabled
+                            from: 0
+                            label: qsTr("Base opacity")
+                            stepSize: 1
+                            suffix: "%"
+                            to: 100
+                            value: (GlobalConfig.appearance.transparency.base ?? 0.85) * 100
+
                             onValueModified: v => {
                                 GlobalConfig.appearance.transparency.base = v / 100;
                             }
                         }
 
                         EffectSlider {
-                            label: qsTr("Layer opacity")
-                            value: (GlobalConfig.appearance.transparency.layers ?? 0.4) * 100
-                            from: 0; to: 100; stepSize: 1; decimals: 0
-                            suffix: "%"
+                            decimals: 0
                             enabled: Colours.transparency.enabled
+                            from: 0
+                            label: qsTr("Layer opacity")
+                            stepSize: 1
+                            suffix: "%"
+                            to: 100
+                            value: (GlobalConfig.appearance.transparency.layers ?? 0.4) * 100
+
                             onValueModified: v => {
                                 GlobalConfig.appearance.transparency.layers = v / 100;
                             }
@@ -576,14 +540,15 @@ Item {
                 spacing: Tokens.spacing.small
 
                 StyledText {
-                    text: qsTr("Hyprland blur")
-                    font.pointSize: Tokens.font.size.normal
                     color: Colours.palette.m3onSurfaceVariant
+                    font: Tokens.font.body.medium
+                    text: qsTr("Hyprland blur")
                 }
 
-                SwitchRow {
-                    label: qsTr("Enabled")
+                EffectSwitch {
                     checked: root.nativeBlurEnabled
+                    label: qsTr("Enabled")
+
                     onToggled: checked => {
                         root.nativeBlurEnabled = checked;
                         root.applyNativeBlur("enabled", checked ? 1 : 0);
@@ -593,25 +558,29 @@ Item {
 
                 StyledRect {
                     Layout.fillWidth: true
-                    implicitHeight: blurSliders.implicitHeight + Tokens.padding.normal * 2
-                    radius: Tokens.rounding.normal
                     color: Colours.tPalette.m3surfaceContainer
+                    implicitHeight: blurSliders.implicitHeight + Tokens.padding.medium * 2
                     opacity: root.nativeBlurEnabled ? 1.0 : 0.5
+                    radius: Tokens.rounding.medium
 
                     ColumnLayout {
                         id: blurSliders
 
                         anchors.left: parent.left
+                        anchors.margins: Tokens.padding.medium
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: Tokens.padding.normal
-                        spacing: Tokens.spacing.normal
                         enabled: root.nativeBlurEnabled
+                        spacing: Tokens.spacing.medium
 
                         EffectSlider {
+                            decimals: 0
+                            from: 1
                             label: qsTr("Size")
+                            stepSize: 1
+                            to: 20
                             value: root.nativeBlurSize
-                            from: 1; to: 20; stepSize: 1; decimals: 0
+
                             onValueModified: v => {
                                 root.nativeBlurSize = Math.round(v);
                                 root.applyNativeBlur("size", Math.round(v));
@@ -620,9 +589,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 0
+                            from: 1
                             label: qsTr("Passes")
+                            stepSize: 1
+                            to: 6
                             value: root.nativeBlurPasses
-                            from: 1; to: 6; stepSize: 1; decimals: 0
+
                             onValueModified: v => {
                                 root.nativeBlurPasses = Math.round(v);
                                 root.applyNativeBlur("passes", Math.round(v));
@@ -639,14 +612,15 @@ Item {
                 spacing: Tokens.spacing.small
 
                 StyledText {
-                    text: qsTr("HyprGlass")
-                    font.pointSize: Tokens.font.size.normal
                     color: Colours.palette.m3onSurfaceVariant
+                    font: Tokens.font.body.medium
+                    text: qsTr("HyprGlass")
                 }
 
-                SwitchRow {
-                    label: qsTr("Enabled")
+                EffectSwitch {
                     checked: root.hgEnabled
+                    label: qsTr("Enabled")
+
                     onToggled: checked => {
                         root.hgEnabled = checked;
                         root.applyHg("enabled", checked ? 1 : 0);
@@ -654,9 +628,10 @@ Item {
                     }
                 }
 
-                SwitchRow {
-                    label: qsTr("Caelestia drawer glass")
+                EffectSwitch {
                     checked: root.hgLayersEnabled
+                    label: qsTr("Caelestia drawer glass")
+
                     onToggled: checked => {
                         root.hgLayersEnabled = checked;
                         root.applyHgLayers();
@@ -666,25 +641,29 @@ Item {
 
                 StyledRect {
                     Layout.fillWidth: true
-                    implicitHeight: hgSliders.implicitHeight + Tokens.padding.normal * 2
-                    radius: Tokens.rounding.normal
                     color: Colours.tPalette.m3surfaceContainer
+                    implicitHeight: hgSliders.implicitHeight + Tokens.padding.medium * 2
                     opacity: root.hgEnabled ? 1.0 : 0.5
+                    radius: Tokens.rounding.medium
 
                     ColumnLayout {
                         id: hgSliders
 
                         anchors.left: parent.left
+                        anchors.margins: Tokens.padding.medium
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: Tokens.padding.normal
-                        spacing: Tokens.spacing.normal
                         enabled: root.hgEnabled
+                        spacing: Tokens.spacing.medium
 
                         EffectSlider {
+                            decimals: 1
+                            from: 0
                             label: qsTr("Blur strength")
+                            stepSize: 0.5
+                            to: 20
                             value: root.hgBlurStrength
-                            from: 0; to: 20; stepSize: 0.5; decimals: 1
+
                             onValueModified: v => {
                                 root.hgBlurStrength = v;
                                 root.hgChange("blur_strength", v);
@@ -692,9 +671,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 0
+                            from: 1
                             label: qsTr("Blur iterations")
+                            stepSize: 1
+                            to: 10
                             value: root.hgBlurIterations
-                            from: 1; to: 10; stepSize: 1; decimals: 0
+
                             onValueModified: v => {
                                 root.hgBlurIterations = Math.round(v);
                                 root.hgChange("blur_iterations", Math.round(v));
@@ -702,9 +685,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 2
+                            from: 0
                             label: qsTr("Refraction")
+                            stepSize: 0.05
+                            to: 2
                             value: root.hgRefractionStrength
-                            from: 0; to: 2; stepSize: 0.05; decimals: 2
+
                             onValueModified: v => {
                                 root.hgRefractionStrength = v;
                                 root.hgChange("refraction_strength", v);
@@ -712,9 +699,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 2
+                            from: 0
                             label: qsTr("Chromatic aberration")
+                            stepSize: 0.05
+                            to: 2
                             value: root.hgChromaticAberration
-                            from: 0; to: 2; stepSize: 0.05; decimals: 2
+
                             onValueModified: v => {
                                 root.hgChromaticAberration = v;
                                 root.hgChange("chromatic_aberration", v);
@@ -722,9 +713,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 2
+                            from: 0
                             label: qsTr("Fresnel")
+                            stepSize: 0.05
+                            to: 1
                             value: root.hgFresnelStrength
-                            from: 0; to: 1; stepSize: 0.05; decimals: 2
+
                             onValueModified: v => {
                                 root.hgFresnelStrength = v;
                                 root.hgChange("fresnel_strength", v);
@@ -732,9 +727,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 2
+                            from: 0
                             label: qsTr("Specular")
+                            stepSize: 0.05
+                            to: 1
                             value: root.hgSpecularStrength
-                            from: 0; to: 1; stepSize: 0.05; decimals: 2
+
                             onValueModified: v => {
                                 root.hgSpecularStrength = v;
                                 root.hgChange("specular_strength", v);
@@ -742,9 +741,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 2
+                            from: 0
                             label: qsTr("Edge thickness")
+                            stepSize: 0.01
+                            to: 0.5
                             value: root.hgEdgeThickness
-                            from: 0; to: 0.5; stepSize: 0.01; decimals: 2
+
                             onValueModified: v => {
                                 root.hgEdgeThickness = v;
                                 root.hgChange("edge_thickness", v);
@@ -752,9 +755,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 2
+                            from: 0
                             label: qsTr("Lens distortion")
+                            stepSize: 0.05
+                            to: 2
                             value: root.hgLensDistortion
-                            from: 0; to: 2; stepSize: 0.05; decimals: 2
+
                             onValueModified: v => {
                                 root.hgLensDistortion = v;
                                 root.hgChange("lens_distortion", v);
@@ -762,9 +769,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 2
+                            from: 0
                             label: qsTr("Vibrancy")
+                            stepSize: 0.05
+                            to: 1
                             value: root.hgVibrancy
-                            from: 0; to: 1; stepSize: 0.05; decimals: 2
+
                             onValueModified: v => {
                                 root.hgVibrancy = v;
                                 root.hgChange("vibrancy", v);
@@ -772,9 +783,13 @@ Item {
                         }
 
                         EffectSlider {
+                            decimals: 2
+                            from: 0
                             label: qsTr("Vibrancy darkness")
+                            stepSize: 0.05
+                            to: 1
                             value: root.hgVibrancyDarkness
-                            from: 0; to: 1; stepSize: 0.05; decimals: 2
+
                             onValueModified: v => {
                                 root.hgVibrancyDarkness = v;
                                 root.hgChange("vibrancy_darkness", v);
@@ -790,40 +805,45 @@ Item {
                 spacing: Tokens.spacing.small
 
                 StyledText {
-                    text: qsTr("Ghostty")
-                    font.pointSize: Tokens.font.size.normal
                     color: Colours.palette.m3onSurfaceVariant
+                    font: Tokens.font.body.medium
+                    text: qsTr("Ghostty")
                 }
 
                 StyledRect {
                     Layout.fillWidth: true
-                    implicitHeight: ghosttyCol.implicitHeight + Tokens.padding.normal * 2
-                    radius: Tokens.rounding.normal
                     color: Colours.tPalette.m3surfaceContainer
+                    implicitHeight: ghosttyCol.implicitHeight + Tokens.padding.medium * 2
+                    radius: Tokens.rounding.medium
 
                     ColumnLayout {
                         id: ghosttyCol
 
                         anchors.left: parent.left
+                        anchors.margins: Tokens.padding.medium
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: Tokens.padding.normal
-                        spacing: Tokens.spacing.normal
+                        spacing: Tokens.spacing.medium
 
                         EffectSlider {
+                            decimals: 0
+                            from: 0
                             label: qsTr("Background opacity")
-                            value: root.ghosttyOpacity * 100
-                            from: 0; to: 100; stepSize: 1; decimals: 0
+                            stepSize: 1
                             suffix: "%"
+                            to: 100
+                            value: root.ghosttyOpacity * 100
+
                             onValueModified: v => {
                                 root.ghosttyOpacity = v / 100;
                                 ghosttyDebounce.restart();
                             }
                         }
 
-                        SwitchRow {
-                            label: qsTr("Background blur")
+                        EffectSwitch {
                             checked: root.ghosttyBlur
+                            label: qsTr("Background blur")
+
                             onToggled: checked => {
                                 root.ghosttyBlur = checked;
                                 if (checked && !root.nativeBlurEnabled) {
@@ -837,12 +857,12 @@ Item {
 
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: Tokens.spacing.smaller
+                            spacing: Tokens.spacing.extraSmall
 
                             StyledText {
-                                text: qsTr("HyprGlass preset rule")
-                                font.pointSize: Tokens.font.size.smaller
                                 color: Colours.palette.m3onSurfaceVariant
+                                font: Tokens.font.body.small
+                                text: qsTr("HyprGlass preset rule")
                             }
 
                             Flow {
@@ -851,20 +871,37 @@ Item {
 
                                 Repeater {
                                     model: [
-                                        { id: "off", label: qsTr("Off") },
-                                        { id: "subtle", label: qsTr("Subtle") },
-                                        { id: "clear", label: qsTr("Clear") },
-                                        { id: "glass", label: qsTr("Glass") },
-                                        { id: "high_contrast", label: qsTr("High contrast") },
+                                        {
+                                            id: "off",
+                                            label: qsTr("Off")
+                                        },
+                                        {
+                                            id: "subtle",
+                                            label: qsTr("Subtle")
+                                        },
+                                        {
+                                            id: "clear",
+                                            label: qsTr("Clear")
+                                        },
+                                        {
+                                            id: "glass",
+                                            label: qsTr("Glass")
+                                        },
+                                        {
+                                            id: "high_contrast",
+                                            label: qsTr("High contrast")
+                                        },
                                     ]
 
                                     delegate: IconTextButton {
                                         required property var modelData
-                                        text: modelData.label
+
                                         checked: root.ghosttyPreset === modelData.id
+                                        font: Tokens.font.body.small
+                                        text: modelData.label
                                         type: IconTextButton.Tonal
-                                        font.pointSize: Tokens.font.size.smaller
                                         verticalPadding: Tokens.padding.small
+
                                         onClicked: root.setGhosttyPreset(modelData.id)
                                     }
                                 }
@@ -879,49 +916,87 @@ Item {
     component EffectSlider: ColumnLayout {
         id: slider
 
-        property string label
-        property real value
-        property real from: 0
-        property real to: 1
-        property real stepSize: 0.01
         property int decimals: 2
+        property real from: 0
+        property string label
+        property real stepSize: 0.01
         property string suffix: ""
+        property real to: 1
+        property real value
 
         signal valueModified(real newValue)
 
         Layout.fillWidth: true
-        spacing: Tokens.spacing.smaller
+        spacing: Tokens.spacing.extraSmall
 
         RowLayout {
             Layout.fillWidth: true
             spacing: Tokens.spacing.small
 
             StyledText {
-                text: slider.label
-                font.pointSize: Tokens.font.size.smaller
                 color: Colours.palette.m3onSurfaceVariant
+                font: Tokens.font.body.small
+                text: slider.label
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
 
             StyledText {
-                text: slider.value.toFixed(slider.decimals) + slider.suffix
-                font.pointSize: Tokens.font.size.smaller
                 color: Colours.palette.m3onSurface
-                font.family: Tokens.font.family.mono
+                font: Tokens.font.mono.small
+                text: slider.value.toFixed(slider.decimals) + slider.suffix
             }
         }
 
         StyledSlider {
             Layout.fillWidth: true
-            implicitHeight: Tokens.padding.normal * 3
             from: slider.from
-            to: slider.to
-            stepSize: slider.stepSize
-            value: slider.value
+            implicitHeight: Tokens.padding.medium * 3
             live: false
+            stepSize: slider.stepSize
+            to: slider.to
+            value: slider.value
+
             onMoved: slider.valueModified(value)
-            onPressedChanged: if (!pressed) slider.valueModified(value)
+            onPressedChanged: if (!pressed)
+                slider.valueModified(value)
+        }
+    }
+    component EffectSwitch: StyledRect {
+        id: switchRow
+
+        required property bool checked
+        required property string label
+
+        signal toggled(bool checked)
+
+        Layout.fillWidth: true
+        color: Colours.layer(Colours.palette.m3surfaceContainer, 2)
+        implicitHeight: switchLayout.implicitHeight + Tokens.padding.large * 2
+        radius: Tokens.rounding.medium
+
+        RowLayout {
+            id: switchLayout
+
+            anchors.left: parent.left
+            anchors.margins: Tokens.padding.large
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Tokens.spacing.medium
+
+            StyledText {
+                Layout.fillWidth: true
+                text: switchRow.label
+            }
+
+            StyledSwitch {
+                checked: switchRow.checked
+                enabled: switchRow.enabled
+
+                onToggled: switchRow.toggled(checked)
+            }
         }
     }
 }

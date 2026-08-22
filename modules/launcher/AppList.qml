@@ -13,42 +13,35 @@ import qs.modules.launcher.services
 StyledListView {
     id: root
 
-    required property StyledTextField search
-    required property DrawerVisibilities visibilities
+    readonly property string displayState: stateForText(displayText)
+    property string displayText
+    readonly property string requestedState: stateForText(search.text)
+    required property ScreenState screenState
+    required property SearchBar search
+    readonly property list<string> systemActionAppNames: ["shut down", "reboot", "log out", "suspend", "lock screen"]
 
-    model: ScriptModel {
-        id: model
-
-        onValuesChanged: root.currentIndex = 0
+    function normalSearch(search: string): list<var> {
+        const actions = Actions.normalSearch(search);
+        const apps = Apps.search(search).filter(a => !systemActionAppNames.includes((a.name ?? "").toLowerCase()));
+        return [...actions, ...apps];
     }
 
-    spacing: Tokens.spacing.small
-    orientation: Qt.Vertical
-    implicitHeight: (Tokens.sizes.launcher.itemHeight + spacing) * Math.min(Config.launcher.maxShown, count) - spacing
-
-    preferredHighlightBegin: 0
-    preferredHighlightEnd: height
-    highlightRangeMode: ListView.ApplyRange
-
-    highlightFollowsCurrentItem: false
-    highlight: StyledRect {
-        radius: Tokens.rounding.normal
-        color: Colours.palette.m3onSurface
-        opacity: 0.08
-
-        y: root.currentItem?.y ?? 0
-        implicitWidth: root.width
-        implicitHeight: root.currentItem?.implicitHeight ?? 0
-
-        Behavior on y {
-            Anim {
-                type: Anim.DefaultSpatial
-            }
+    function resultsForText(text: string): var {
+        switch (stateForText(text)) {
+        case "actions":
+            return Actions.query(text);
+        case "calc":
+            return [0];
+        case "scheme":
+            return Schemes.query(text);
+        case "variant":
+            return M3Variants.query(text);
+        default:
+            return Apps.search(text);
         }
     }
 
-    state: {
-        const text = search.text;
+    function stateForText(text: string): string {
         const prefix = GlobalConfig.launcher.actionPrefix;
         if (text.startsWith(prefix)) {
             for (const action of ["calc", "scheme", "variant"])
@@ -61,19 +54,95 @@ StyledListView {
         return "apps";
     }
 
-    readonly property list<string> systemActionAppNames: ["shut down", "reboot", "log out", "suspend", "lock screen"]
-
-    function normalSearch(search: string): list<var> {
-        const actions = Actions.normalSearch(search);
-        const apps = Apps.search(search).filter(a => !systemActionAppNames.includes((a.name ?? "").toLowerCase()));
-        return [...actions, ...apps];
+    function syncDisplayText(): void {
+        if (screenState.launcher && requestedState === displayState)
+            displayText = search.text;
     }
 
-    onStateChanged: {
-        if (state === "scheme" || state === "variant")
-            Schemes.reload();
-    }
+    highlightFollowsCurrentItem: false
+    highlightRangeMode: ListView.ApplyRange
+    implicitHeight: (Tokens.sizes.launcher.itemHeight + spacing) * Math.min(Config.launcher.maxShown, count) - spacing
+    orientation: Qt.Vertical
+    preferredHighlightBegin: 0
+    preferredHighlightEnd: height
+    spacing: Tokens.spacing.small
+    state: screenState.launcher ? requestedState : displayState
 
+    StyledScrollBar.vertical: StyledScrollBar {
+        flickable: root
+    }
+    add: Transition {
+        enabled: !root.state
+
+        Anim {
+            from: 0
+            property: "opacity"
+            to: 1
+            type: Anim.DefaultEffects
+        }
+    }
+    addDisplaced: Transition {
+        Anim {
+            property: "y"
+            type: Anim.StandardSmall
+        }
+
+        Anim {
+            property: "opacity"
+            to: 1
+            type: Anim.DefaultEffects
+        }
+    }
+    displaced: Transition {
+        Anim {
+            property: "y"
+        }
+
+        Anim {
+            property: "opacity"
+            to: 1
+            type: Anim.DefaultEffects
+        }
+    }
+    highlight: StyledRect {
+        color: Colours.palette.m3onSurface
+        implicitHeight: root.currentItem?.implicitHeight ?? 0
+        implicitWidth: root.width
+        opacity: 0.08
+        radius: Tokens.rounding.large
+        y: root.currentItem?.y ?? 0
+
+        Behavior on y {
+            Anim {
+            }
+        }
+    }
+    model: ScriptModel {
+        values: root.resultsForText(root.displayText)
+
+        onValuesChanged: root.currentIndex = 0
+    }
+    move: Transition {
+        Anim {
+            property: "y"
+        }
+
+        Anim {
+            property: "opacity"
+            to: 1
+            type: Anim.DefaultEffects
+        }
+    }
+    remove: Transition {
+        enabled: !root.state
+
+        Anim {
+            from: 1
+            property: "opacity"
+            to: 0
+            type: Anim.DefaultEffects
+        }
+    }
     states: [
         State {
             name: "apps"
@@ -87,7 +156,6 @@ StyledListView {
             name: "actions"
 
             PropertyChanges {
-                model.values: Actions.query(search.text)
                 root.delegate: actionItem
             }
         },
@@ -95,7 +163,6 @@ StyledListView {
             name: "calc"
 
             PropertyChanges {
-                model.values: [0]
                 root.delegate: calcItem
             }
         },
@@ -103,7 +170,6 @@ StyledListView {
             name: "scheme"
 
             PropertyChanges {
-                model.values: Schemes.query(search.text)
                 root.delegate: schemeItem
             }
         },
@@ -111,115 +177,79 @@ StyledListView {
             name: "variant"
 
             PropertyChanges {
-                model.values: M3Variants.query(search.text)
                 root.delegate: variantItem
             }
         }
     ]
-
     transitions: Transition {
         SequentialAnimation {
             ParallelAnimation {
                 Anim {
-                    target: root
+                    duration: Tokens.anim.durations.small
+                    easing: Tokens.anim.standardAccel
+                    from: 1
                     property: "opacity"
-                    from: 1
-                    to: 0
-                    duration: Tokens.anim.durations.small
-                    easing: Tokens.anim.standardAccel
-                }
-                Anim {
                     target: root
-                    property: "scale"
-                    from: 1
-                    to: 0.9
+                    to: 0
+                }
+
+                Anim {
                     duration: Tokens.anim.durations.small
                     easing: Tokens.anim.standardAccel
+                    from: 1
+                    property: "scale"
+                    target: root
+                    to: 0.9
                 }
             }
+
             PropertyAction {
-                targets: [model, root]
-                properties: "values,delegate"
+                property: "delegate"
+                target: root
+                value: null
             }
+
+            ScriptAction {
+                script: root.displayText = root.search.text
+            }
+
+            PropertyAction {
+                property: "delegate"
+                target: root
+            }
+
             ParallelAnimation {
                 Anim {
-                    target: root
-                    property: "opacity"
+                    duration: Tokens.anim.durations.small
+                    easing: Tokens.anim.standardDecel
                     from: 0
-                    to: 1
-                    duration: Tokens.anim.durations.small
-                    easing: Tokens.anim.standardDecel
-                }
-                Anim {
+                    property: "opacity"
                     target: root
-                    property: "scale"
-                    from: 0.9
                     to: 1
+                }
+
+                Anim {
                     duration: Tokens.anim.durations.small
                     easing: Tokens.anim.standardDecel
+                    from: 0.9
+                    property: "scale"
+                    target: root
+                    to: 1
                 }
             }
+
             PropertyAction {
-                targets: [root.add, root.remove]
                 property: "enabled"
+                targets: [root.add, root.remove]
                 value: true
             }
         }
     }
 
-    StyledScrollBar.vertical: StyledScrollBar {
-        flickable: root
-    }
-
-    add: Transition {
-        enabled: !root.state
-
-        Anim {
-            properties: "opacity,scale"
-            from: 0
-            to: 1
-        }
-    }
-
-    remove: Transition {
-        enabled: !root.state
-
-        Anim {
-            properties: "opacity,scale"
-            from: 1
-            to: 0
-        }
-    }
-
-    move: Transition {
-        Anim {
-            property: "y"
-        }
-        Anim {
-            properties: "opacity,scale"
-            to: 1
-        }
-    }
-
-    addDisplaced: Transition {
-        Anim {
-            property: "y"
-            type: Anim.StandardSmall
-        }
-        Anim {
-            properties: "opacity,scale"
-            to: 1
-        }
-    }
-
-    displaced: Transition {
-        Anim {
-            property: "y"
-        }
-        Anim {
-            properties: "opacity,scale"
-            to: 1
-        }
+    Component.onCompleted: displayText = search.text
+    onStateChanged: {
+        if (state === "scheme" || state === "variant")
+            Schemes.reload();
     }
 
     Component {
@@ -235,8 +265,6 @@ StyledListView {
             implicitHeight: Tokens.sizes.launcher.itemHeight
 
             Loader {
-                id: itemLoader
-
                 anchors.fill: parent
                 sourceComponent: mixedDelegate.modelData?.launcherType === "action" ? mixedActionItem : mixedAppItem
             }
@@ -246,7 +274,7 @@ StyledListView {
 
                 AppItem {
                     modelData: mixedDelegate.modelData
-                    visibilities: root.visibilities
+                    screenState: root.screenState
                 }
             }
 
@@ -254,8 +282,8 @@ StyledListView {
                 id: mixedActionItem
 
                 ActionItem {
-                    modelData: mixedDelegate.modelData
                     list: root
+                    modelData: mixedDelegate.modelData
                 }
             }
         }
@@ -291,5 +319,21 @@ StyledListView {
         VariantItem {
             list: root
         }
+    }
+
+    Connections {
+        function onTextChanged() {
+            root.syncDisplayText();
+        }
+
+        target: root.search
+    }
+
+    Connections {
+        function onLauncherChanged() {
+            root.syncDisplayText();
+        }
+
+        target: root.screenState
     }
 }
