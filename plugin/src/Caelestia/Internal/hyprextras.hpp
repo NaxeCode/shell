@@ -4,6 +4,7 @@
 #include <qobject.h>
 #include <qqmlintegration.h>
 #include <qsharedpointer.h>
+#include <qtimer.h>
 #include <qvariant.h>
 
 namespace caelestia::internal::hypr {
@@ -42,7 +43,9 @@ private:
     QString m_requestSocket;
     QString m_eventSocket;
     QLocalSocket* m_socket;
+    QTimer* const m_reconnectTimer;
     bool m_socketValid;
+    bool m_reconnecting = false;
     bool m_usingLua = false;
 
     QVariantHash m_options;
@@ -53,6 +56,7 @@ private:
 
     void socketError(QLocalSocket::LocalSocketError error) const;
     void socketStateChanged(QLocalSocket::LocalSocketState state);
+    void connectEventSocket();
     void readEvent();
     void handleEvent(const QString& event);
 

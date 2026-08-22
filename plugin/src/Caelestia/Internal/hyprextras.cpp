@@ -16,6 +16,7 @@ HyprExtras::HyprExtras(QObject* parent)
     , m_requestSocket("")
     , m_eventSocket("")
     , m_socket(nullptr)
+    , m_reconnectTimer(new QTimer(this))
     , m_socketValid(false)
     , m_devices(new HyprDevices(this)) {
     const auto his = qEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE");
@@ -41,12 +42,15 @@ HyprExtras::HyprExtras(QObject* parent)
     refreshDevices();
 
     m_socket = new QLocalSocket(this);
+    m_reconnectTimer->setInterval(1000);
+    m_reconnectTimer->setSingleShot(true);
 
     QObject::connect(m_socket, &QLocalSocket::errorOccurred, this, &HyprExtras::socketError);
     QObject::connect(m_socket, &QLocalSocket::stateChanged, this, &HyprExtras::socketStateChanged);
     QObject::connect(m_socket, &QLocalSocket::readyRead, this, &HyprExtras::readEvent);
+    QObject::connect(m_reconnectTimer, &QTimer::timeout, this, &HyprExtras::connectEventSocket);
 
-    m_socket->connectToServer(m_eventSocket, QLocalSocket::ReadOnly);
+    connectEventSocket();
 }
 
 QVariantHash HyprExtras::options() const {
@@ -153,19 +157,34 @@ void HyprExtras::refreshDevices() {
 }
 
 void HyprExtras::socketError(QLocalSocket::LocalSocketError error) const {
-    if (!m_socketValid) {
-        qCWarning(lcHypr) << "socketError: unable to connect to Hyprland event socket:" << error;
-    } else {
+    if (m_socketValid) {
         qCWarning(lcHypr) << "socketError: Hyprland event socket error:" << error;
+    } else if (!m_reconnecting) {
+        qCWarning(lcHypr) << "socketError: unable to connect to Hyprland event socket:" << error;
     }
 }
 
 void HyprExtras::socketStateChanged(QLocalSocket::LocalSocketState state) {
-    if (state == QLocalSocket::UnconnectedState && m_socketValid) {
-        qCWarning(lcHypr) << "socketStateChanged: Hyprland event socket disconnected.";
+    if (state == QLocalSocket::ConnectedState) {
+        if (m_reconnecting) {
+            qCInfo(lcHypr) << "Reconnected to Hyprland event socket.";
+        }
+        m_reconnectTimer->stop();
+        m_reconnecting = false;
+        m_socketValid = true;
+    } else if (state == QLocalSocket::UnconnectedState) {
+        m_socketValid = false;
+        m_reconnecting = true;
+        m_reconnectTimer->start();
+    }
+}
+
+void HyprExtras::connectEventSocket() {
+    if (m_eventSocket.isEmpty() || m_socket->state() != QLocalSocket::UnconnectedState) {
+        return;
     }
 
-    m_socketValid = state == QLocalSocket::ConnectedState;
+    m_socket->connectToServer(m_eventSocket, QLocalSocket::ReadOnly);
 }
 
 void HyprExtras::readEvent() {
