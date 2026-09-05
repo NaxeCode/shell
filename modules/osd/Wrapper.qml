@@ -43,7 +43,8 @@ Item {
     visible: oledBlackout ? (shouldBeActive || offsetScale < 0.99) : offsetScale < 1
     anchors.rightMargin: (-implicitWidth - hiddenOverscan - sidebarOffset) * offsetScale
     implicitWidth: content.implicitWidth
-    implicitHeight: content.implicitHeight
+    // Keep a usable edge-hover target while the lazy content is unloaded.
+    implicitHeight: content.implicitHeight || Tokens.sizes.osd.sliderHeight + Tokens.padding.large * 2
     opacity: 1 - offsetScale
 
     Behavior on offsetScale {
