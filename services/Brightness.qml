@@ -11,6 +11,8 @@ import qs.utils
 Singleton {
     id: root
 
+    // Opt-in serials owned by the adaptive daemon. No DDC fallback on daemon failure.
+    readonly property var adaptiveSerials: (Quickshell.env("CAELESTIA_ADAPTIVE_SERIALS") || "").split(",")
     property list<var> ddcMonitors: []
     property bool ddcDetectionComplete
     property bool brightnessStateLoaded
@@ -258,6 +260,8 @@ Singleton {
         readonly property bool isAppleDisplay: !!modelData && root.appleDisplayPresent && modelData.model.startsWith("StudioDisplay")
         readonly property string stateKey: !modelData ? "" : (ddcInfo?.serial ? `serial:${ddcInfo.serial}` : (modelData.serialNumber ? `serial:${modelData.serialNumber}` : `connector:${modelData.name}`))
         readonly property string legacyStateKey: !modelData ? "" : `connector:${modelData.name}`
+        readonly property string adaptiveSerial: ddcInfo?.serial || modelData?.serialNumber || ""
+        readonly property bool isAdaptive: adaptiveSerial.length > 0 && root.adaptiveSerials.includes(adaptiveSerial)
         property int maxBrightness: 100
         property real brightness
         property real queuedBrightness: NaN
@@ -345,7 +349,10 @@ Singleton {
             queuedBrightness = NaN;
             brightness = value;
 
-            if (isAppleDisplay)
+            if (isAdaptive) {
+                setProc.command = ["monitor-brightness", "manual", adaptiveSerial, `${rounded}`];
+                setProc.running = true;
+            } else if (isAppleDisplay)
                 Quickshell.execDetached(["asdbctl", "set", rounded]);
             else if (isDdc) {
                 setProc.command = ["ddcutil", "--verify", "-b", busNum, "setvcp", "10", `${Math.round(value * maxBrightness)}`];
@@ -358,6 +365,10 @@ Singleton {
             if (!modelData || !root.ddcDetectionComplete || !root.brightnessStateLoaded)
                 return;
 
+            if (isAdaptive) {
+                initBrightness(); // Read current policy; never replay yesterday's saved brightness.
+                return;
+            }
             let saved = root.brightnessState[stateKey];
             if (!(typeof saved === "number" && isFinite(saved)) && stateKey !== legacyStateKey) {
                 saved = root.brightnessState[legacyStateKey];
@@ -380,7 +391,9 @@ Singleton {
             if (!modelData)
                 return;
 
-            if (isAppleDisplay)
+            if (isAdaptive)
+                initProc.command = ["monitor-brightness", "get", adaptiveSerial];
+            else if (isAppleDisplay)
                 initProc.command = ["asdbctl", "get"];
             else if (isDdc)
                 initProc.command = ["ddcutil", "-b", busNum, "getvcp", "10", "--brief"];
@@ -390,6 +403,12 @@ Singleton {
             initProc.running = true;
         }
 
+        readonly property Timer adaptiveRefresh: Timer {
+            interval: 15000
+            running: monitor.isAdaptive
+            repeat: true
+            onTriggered: { if (!monitor.setProc.running && !monitor.initProc.running) monitor.initBrightness(); }
+        }
         onBusNumChanged: restoreBrightness()
         Component.onCompleted: restoreBrightness()
     }
