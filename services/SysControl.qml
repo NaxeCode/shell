@@ -90,7 +90,6 @@ Singleton {
     function setMonitorMode(mode: string): void {
         const map = {
             desk: "mon-desk",
-            cintiq: "mon-cin",
             gaming: "mon-gam",
             "cool-s": "mon-cool-s"
         };

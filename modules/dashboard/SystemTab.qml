@@ -265,11 +265,6 @@ Item {
                             label: qsTr("Desk")
                         },
                         {
-                            id: "cintiq",
-                            icon: "draw",
-                            label: qsTr("Cintiq")
-                        },
-                        {
                             id: "gaming",
                             icon: "stadia_controller",
                             label: qsTr("Gaming")
