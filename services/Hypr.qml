@@ -83,6 +83,10 @@ Singleton {
         return monitors.values.map(e => e.name);
     }
 
+    function refreshMonitors(): void {
+        Hyprland.refreshMonitors();
+    }
+
     function monitorFor(screen: ShellScreen): HyprlandMonitor {
         return Hyprland.monitorFor(screen);
     }

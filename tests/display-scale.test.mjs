@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+
+const context = vm.createContext({});
+vm.runInContext(readFileSync(new URL('../services/DisplayScale.js', import.meta.url), 'utf8').replace('.pragma library', ''), context);
+const fourK = {width: 3840, height: 2160, scale: 2};
+const qhd = {width: 2560, height: 1440, scale: 2};
+assert.equal(context.steps.length, 5);
+for (const step of context.steps) assert.equal(context.available([fourK, fourK], step.value), true);
+assert.equal(context.available([fourK, qhd], 1.5), false);
+assert.equal(context.available([fourK, qhd], 5 / 3), true);
+assert.equal(context.available([], 2), false);
+assert.equal(context.available([{width: null, height: 2160}], 2), false);
+assert.equal(context.valid(fourK, 0), false);
+assert.equal(context.selected([fourK, {...fourK, scale: 1.5}], 2), false);
+assert.equal(context.selected([{...fourK, scale: 1.67}], 5 / 3), true);
+assert.equal(context.selected([{...fourK, scale: null}], 1), false);
+assert.equal(context.selected([], 1), false);
+assert.equal(context.steps.find(step => step.value === 5 / 3).argument, '1.666667');
+assert.equal(context.label(1.67), '167%');
+assert.equal(context.label(null), '—');
+console.log('Display scale checks passed.');

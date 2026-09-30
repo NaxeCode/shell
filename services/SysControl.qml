@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "PowerTelemetry.js" as Telemetry
+import "DisplayScale.js" as DisplayScale
 
 Singleton {
     id: root
@@ -27,6 +28,8 @@ Singleton {
     readonly property string profileSaved: snapshot?.profile?.saved ?? "unknown"
     readonly property bool ready: snapshot !== null
     readonly property var room: snapshot?.room ?? null
+    readonly property bool scaleBusy: scaleProc.running
+    readonly property string scaleError: state.scaleError
 
     // Keep the shared pp-status schema intact, including null (unavailable).
     readonly property var snapshot: state.snapshot
@@ -94,6 +97,13 @@ Singleton {
         actionProc.command = [Quickshell.env("HOME") + "/.local/bin/pp-" + name];
         actionProc.running = true;
     }
+    function setScale(scale: string): void {
+        if (scaleProc.running || !DisplayScale.steps.some(step => step.argument === scale))
+            return;
+        state.scaleError = "";
+        scaleProc.command = [Quickshell.env("HOME") + "/.local/bin/hypr-scale-toggle", scale];
+        scaleProc.running = true;
+    }
     function subscribe(consumer): void {
         if (!consumers.includes(consumer))
             consumers = consumers.concat([consumer]);
@@ -116,6 +126,7 @@ Singleton {
         property string error: ""
         property var monitorConf: ({})
         property double now: Date.now()
+        property string scaleError: ""
         property var snapshot: null
     }
     FileView {
@@ -179,6 +190,29 @@ Singleton {
         onExited: (code, status) => {
             state.actionError = code === 0 ? "" : "Could not apply the profile. Try again.";
             root.refresh();
+        }
+    }
+    Process {
+        id: scaleProc
+
+        onExited: (code, status) => {
+            scaleTimeout.stop();
+            state.scaleError = code === 0 ? "" : "Could not change scale. Try again.";
+            Hypr.refreshMonitors();
+        }
+        onRunningChanged: {
+            if (running)
+                scaleTimeout.restart();
+        }
+    }
+    Timer {
+        id: scaleTimeout
+
+        interval: 10000
+
+        onTriggered: {
+            state.scaleError = "Scale change timed out. Check the current display size.";
+            scaleProc.running = false;
         }
     }
     Timer {

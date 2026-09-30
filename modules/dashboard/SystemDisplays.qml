@@ -5,9 +5,13 @@ import Caelestia.Config
 import qs.components
 import qs.components.controls
 import qs.services
+import "../../services/DisplayScale.js" as DisplayScale
 
 Item {
     id: root
+
+    readonly property var activeMonitors: Hypr.monitors.values.filter(monitor => monitor.lastIpcObject && !monitor.lastIpcObject.disabled)
+    readonly property var monitorReadings: activeMonitors.map(monitor => monitor.lastIpcObject)
 
     // Helpers — derive everything from lastIpcObject so cable swaps don't break.
     function fmtHz(hz): string {
@@ -118,6 +122,15 @@ Item {
 
     implicitHeight: layout.implicitHeight
 
+    // Also reflects scale changes made with the existing keyboard shortcuts.
+    Timer {
+        interval: 2000
+        repeat: true
+        running: SysControl.polling
+        triggeredOnStart: true
+
+        onTriggered: Hypr.refreshMonitors()
+    }
     ColumnLayout {
         id: layout
 
@@ -192,6 +205,60 @@ Item {
                 wrapMode: Text.WordWrap
             }
         }
+        StyledRect {
+            Layout.fillWidth: true
+            color: Colours.tPalette.m3surfaceContainer
+            implicitHeight: scaleControls.implicitHeight + Tokens.padding.small * 2
+            radius: Tokens.rounding.medium
+
+            GridLayout {
+                id: scaleControls
+
+                anchors.left: parent.left
+                anchors.margins: Tokens.padding.small
+                anchors.right: parent.right
+                anchors.top: parent.top
+                columnSpacing: Tokens.spacing.medium
+                columns: root.width >= 580 ? 2 : 1
+                rowSpacing: Tokens.spacing.small
+
+                StyledText {
+                    font: Tokens.font.body.medium
+                    text: qsTr("Desktop scale")
+                }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: Tokens.spacing.extraSmall
+
+                    Repeater {
+                        model: DisplayScale.steps
+
+                        delegate: IconTextButton {
+                            required property var modelData
+
+                            checked: DisplayScale.selected(root.monitorReadings, modelData.value)
+                            disabled: SysControl.scaleBusy || !DisplayScale.available(root.monitorReadings, modelData.value) || checked
+                            disabledColour: checked ? Colours.palette.m3primary : Colours.tPalette.m3surfaceContainer
+                            disabledOnColour: checked ? Colours.palette.m3onPrimary : Colours.palette.m3onSurfaceVariant
+                            horizontalPadding: Tokens.padding.medium
+                            text: modelData.label
+                            type: checked ? IconTextButton.Filled : IconTextButton.Tonal
+                            verticalPadding: Tokens.padding.small
+
+                            onClicked: SysControl.setScale(modelData.argument)
+                        }
+                    }
+                }
+                StyledText {
+                    Layout.columnSpan: scaleControls.columns
+                    Layout.fillWidth: true
+                    color: SysControl.scaleError ? Colours.palette.m3error : Colours.palette.m3onSurfaceVariant
+                    font: Tokens.font.body.small
+                    text: SysControl.scaleError || (SysControl.scaleBusy ? qsTr("Applying scale…") : qsTr("All displays · temporary; resets when display settings reload."))
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
 
         // ── Connected monitors ────────────────────────────────────────────────
         ColumnLayout {
@@ -210,7 +277,9 @@ Item {
                 rowSpacing: Tokens.spacing.small
 
                 Repeater {
-                    model: Hypr.monitors
+                    model: ScriptModel {
+                        values: root.activeMonitors
+                    }
 
                     delegate: StyledRect {
                         id: tile
@@ -267,12 +336,21 @@ Item {
                                     Layout.fillWidth: true
                                     spacing: 0
 
-                                    StyledText {
+                                    RowLayout {
                                         Layout.fillWidth: true
-                                        color: Colours.palette.m3onSurface
-                                        elide: Text.ElideRight
-                                        font: Tokens.font.body.small
-                                        text: tile.isAwOled ? "Alienware OLED" : (tile.modelData?.lastIpcObject?.model ?? tile.modelData?.name ?? "Display")
+
+                                        StyledText {
+                                            Layout.fillWidth: true
+                                            color: Colours.palette.m3onSurface
+                                            elide: Text.ElideRight
+                                            font: Tokens.font.body.small
+                                            text: tile.isAwOled ? "Alienware OLED" : (tile.modelData?.lastIpcObject?.model ?? tile.modelData?.name ?? "Display")
+                                        }
+                                        StyledText {
+                                            color: Colours.palette.m3onSurfaceVariant
+                                            font: Tokens.font.body.small
+                                            text: DisplayScale.label(tile.modelData?.lastIpcObject?.scale)
+                                        }
                                     }
                                     StyledText {
                                         color: Colours.palette.m3primary

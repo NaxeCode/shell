@@ -162,7 +162,11 @@ The System tab presents the same schema-v2 snapshot as `~/.local/bin/pp-status -
 Its Power & room view shows the saved power profile and verification state, Govee
 room temperature and humidity, estimated tower BTU/h, and CPU/GPU readings. More
 readings expands sensor and policy details. Displays holds the existing monitor
-layout, brightness, resolution, refresh-rate, VRR and HDR controls.
+layout, brightness, resolution, refresh-rate, VRR and HDR controls. Desktop scale
+uses the existing `hypr-scale-toggle` accessibility helper for all active outputs:
+100%, 125%, 150%, 167% (exact 5/3), and 200%. Invalid steps for the active
+resolutions are disabled. Like the keyboard shortcut, this is temporary zoom;
+the saved layout is restored on a display-settings reload or next login.
 
 The panel is bounded to the available screen space and scrolls on smaller displays.
 Telemetry refreshes every two seconds only while a System tab is open. Missing
@@ -173,6 +177,7 @@ The shared formatter/contract checks run without hardware access:
 
 ```sh
 node tests/power-telemetry.test.mjs
+node tests/display-scale.test.mjs
 ```
 
 ### PFP/Wallpapers
