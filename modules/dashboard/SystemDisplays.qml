@@ -296,12 +296,19 @@ Item {
                                     fontStyle: Tokens.font.icon.medium
                                     text: `brightness_${Math.max(1, Math.min(7, Math.round(tile.brightnessValue * 6) + 1))}`
                                 }
-                                StyledSlider {
+                                Item {
                                     Layout.fillWidth: true
                                     implicitHeight: Tokens.padding.medium * 3
-                                    value: tile.brightnessValue
 
-                                    onMoved: tile.brightnessMonitor?.setBrightness(value)
+                                    StyledSlider {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        bgColour: Colours.palette.m3outlineVariant
+                                        value: tile.brightnessValue
+
+                                        onInteraction: value => tile.brightnessMonitor?.setBrightness(value)
+                                    }
                                 }
                                 StyledText {
                                     color: Colours.palette.m3onSurfaceVariant
