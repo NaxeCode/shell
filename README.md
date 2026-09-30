@@ -156,6 +156,25 @@ caelestia shell mpris getActive trackTitle
 
 You can view the list of available IPC commands by running `caelestia shell -s`.
 
+### NaxeCode System dashboard
+
+The System tab presents the same schema-v2 snapshot as `~/.local/bin/pp-status --json`.
+Its Power & room view shows the saved power profile and verification state, Govee
+room temperature and humidity, estimated tower BTU/h, and CPU/GPU readings. More
+readings expands sensor and policy details. Displays holds the existing monitor
+layout, brightness, resolution, refresh-rate, VRR and HDR controls.
+
+The panel is bounded to the available screen space and scrolls on smaller displays.
+Telemetry refreshes every two seconds only while a System tab is open. Missing
+sensors display an em dash; failed reads retain the last snapshot with a warning.
+Tower heat is explicitly an estimate and excludes monitors.
+
+The shared formatter/contract checks run without hardware access:
+
+```sh
+node tests/power-telemetry.test.mjs
+```
+
 ### PFP/Wallpapers
 
 The profile picture for the dashboard is read from the file `~/.face`. You can set it by clicking it in the dashboard,

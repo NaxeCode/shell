@@ -3,52 +3,40 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "PowerTelemetry.js" as Telemetry
 
-// SysControl — exposes pp-data JSON + lets the dashboard fire pp-* / mon-*
-// scripts. NaxeCode fork. Polls every 2s; pp-data takes ~150ms (RAPL needs
-// 100ms), so the loop is mostly idle.
 Singleton {
     id: root
 
+    readonly property string actionError: state.actionError
     readonly property bool autoHdr: state.autoHdr
-    readonly property int awHz: state.awHz
-    readonly property bool cpuBoost: state.cpuBoost
-    readonly property string cpuEpp: state.cpuEpp
-    readonly property int cpuFreqAvgMhz: state.cpuFreqAvgMhz
-    readonly property int cpuFreqMaxMhz: state.cpuFreqMaxMhz
-
-    // CPU
-    readonly property int cpuPkgW: state.cpuPkgW
-    readonly property int gpuPowerCapW: state.gpuPowerCapW
-
-    // GPU
-    readonly property int gpuPowerW: state.gpuPowerW
-    readonly property int gpuUsagePct: state.gpuUsagePct
-    readonly property int gpuVOffsetMv: state.gpuVOffsetMv
-
-    // Per-monitor conf state parsed from generated ~/.config/hypr/monitor-layout.conf.
-    // Keyed by output name. Each value: { vrr, cm, mode, bitdepth, ... }.
-    // Hyprctl's `lastIpcObject.vrr` only reports VRR ENGAGEMENT (bool), so
-    // for `vrr=2` (fullscreen-only) it shows false at idle even though VRR
-    // is configured on. Conf values are the truth for "is VRR enabled?".
+    readonly property bool busy: actionProc.running
+    property var consumers: []
+    readonly property var cpu: snapshot?.cpu ?? ({})
+    readonly property string error: state.error
+    readonly property var fans: snapshot?.fans ?? []
+    readonly property var gpu: snapshot?.gpu ?? ({})
+    readonly property var heat: snapshot?.heat ?? ({})
     readonly property var monitorConf: state.monitorConf
+    readonly property string monitorMode: snapshot?.monitor_mode ?? "unknown"
+    readonly property double now: state.now
+    readonly property bool polling: consumers.some(consumer => consumer.polling)
+    readonly property string profileActive: snapshot?.profile?.active ?? "unknown"
+    readonly property var profileIssues: snapshot?.profile?.issues ?? []
+    readonly property var profileMatches: snapshot?.profile?.matches ?? null
+    readonly property string profileSaved: snapshot?.profile?.saved ?? "unknown"
+    readonly property bool ready: snapshot !== null
+    readonly property var room: snapshot?.room ?? null
 
-    // Monitor layout (last `mon-*` button — not real-time hyprctl state)
-    readonly property string monitorMode: state.monitorMode
-
-    // Profile
-    readonly property string profileActive: state.profileActive
-    readonly property string profileSaved: state.profileSaved
-    readonly property bool ready: state.ready
-
-    // Govee room sensor; null if listener hasn't broadcast yet
-    readonly property var room: state.room
+    // Keep the shared pp-status schema intact, including null (unavailable).
+    readonly property var snapshot: state.snapshot
+    readonly property bool stale: ready && (state.error !== "" || state.now - Date.parse(snapshot.sampled_at) > 10000)
+    readonly property var warnings: snapshot?.warnings ?? []
 
     function _parseAutoHdr(text: string): bool {
         const match = text.match(/^\s*cm_auto_hdr\s*=\s*(\d+)/m);
         return match ? Number(match[1]) !== 0 : false;
     }
-
     function _parseHyprConf(text: string): var {
         const result = {};
         const lines = text.split("\n");
@@ -79,14 +67,16 @@ Singleton {
         }
         return result;
     }
-
+    function refresh(): void {
+        if (!dataProc.running)
+            dataProc.running = true;
+    }
     function setAutoHdr(enabled: bool): void {
         state.autoHdr = enabled;
         const cmd = `${Quickshell.env("HOME")}/.local/bin/hypr-auto-hdr ${enabled ? "on" : "off"} >> ${Quickshell.env("HOME")}/.local/state/hypr-auto-hdr.log 2>&1`;
         console.warn("SysControl auto HDR:", cmd);
         Quickshell.execDetached(["sh", "-lc", cmd]);
     }
-
     function setMonitorMode(mode: string): void {
         const map = {
             desk: "mon-desk",
@@ -97,35 +87,37 @@ Singleton {
             return;
         Quickshell.execDetached(["sh", "-c", `flock -n "$XDG_RUNTIME_DIR/caelestia-monitor-mode.lock" ~/.local/bin/${cmd}`]);
     }
-
     function setProfile(name: string): void {
-        if (!["cool", "normal", "gaming"].includes(name))
+        if (!["cool", "normal", "gaming"].includes(name) || actionProc.running)
             return;
-        Quickshell.execDetached(["sh", "-c", `~/.local/bin/pp-${name}`]);
+        state.actionError = "";
+        actionProc.command = [Quickshell.env("HOME") + "/.local/bin/pp-" + name];
+        actionProc.running = true;
+    }
+    function subscribe(consumer): void {
+        if (!consumers.includes(consumer))
+            consumers = consumers.concat([consumer]);
+    }
+    function unsubscribe(consumer): void {
+        consumers = consumers.filter(item => item !== consumer);
+    }
+
+    onPollingChanged: {
+        state.now = Date.now();
+        if (polling)
+            refresh();
     }
 
     QtObject {
         id: state
 
+        property string actionError: ""
         property bool autoHdr: false
-        property int awHz: 0
-        property bool cpuBoost: false
-        property string cpuEpp: "?"
-        property int cpuFreqAvgMhz: 0
-        property int cpuFreqMaxMhz: 0
-        property int cpuPkgW: 0
-        property int gpuPowerCapW: 0
-        property int gpuPowerW: 0
-        property int gpuUsagePct: 0
-        property int gpuVOffsetMv: 0
+        property string error: ""
         property var monitorConf: ({})
-        property string monitorMode: "?"
-        property string profileActive: "?"
-        property string profileSaved: "?"
-        property bool ready: false
-        property var room: null
+        property double now: Date.now()
+        property var snapshot: null
     }
-
     FileView {
         path: Quickshell.env("HOME") + "/.config/hypr/monitor-layout.conf"
         watchChanges: true
@@ -133,7 +125,6 @@ Singleton {
         onFileChanged: reload()
         onLoaded: state.monitorConf = root._parseHyprConf(text())
     }
-
     FileView {
         path: Quickshell.env("HOME") + "/.config/hypr/hyprland.conf"
         watchChanges: true
@@ -141,53 +132,67 @@ Singleton {
         onFileChanged: reload()
         onLoaded: state.autoHdr = root._parseAutoHdr(text())
     }
-
     Process {
         id: dataProc
 
-        command: ["pp-data"]
-        running: false
+        // Same reader and contract as the terminal; never parse terminal styling.
+        command: [Quickshell.env("HOME") + "/.local/bin/pp-status", "--json"]
 
         stdout: StdioCollector {
             onStreamFinished: {
-                let raw = this.text.trim();
-                if (!raw)
-                    return;
-                let data;
                 try {
-                    data = JSON.parse(raw);
-                } catch (e) {
-                    console.warn("SysControl: pp-data JSON parse failed:", e);
-                    return;
+                    const data = JSON.parse(text);
+                    if (!Telemetry.validSnapshot(data))
+                        throw new Error("Invalid telemetry");
+                    state.snapshot = data;
+                    state.now = Date.now();
+                    state.error = "";
+                } catch (_) {
+                    state.error = "Readings are temporarily unavailable";
                 }
-                state.profileActive = data.profile?.active ?? "?";
-                state.profileSaved = data.profile?.saved ?? "?";
-                state.monitorMode = data.monitor_mode ?? "?";
-                state.awHz = data.aw_hz ?? 0;
-                state.cpuPkgW = data.cpu?.pkg_w ?? 0;
-                state.cpuFreqAvgMhz = data.cpu?.freq_avg_mhz ?? 0;
-                state.cpuFreqMaxMhz = data.cpu?.freq_max_mhz ?? 0;
-                state.cpuEpp = data.cpu?.epp ?? "?";
-                state.cpuBoost = data.cpu?.boost ?? false;
-                state.gpuPowerW = data.gpu?.power_w ?? 0;
-                state.gpuPowerCapW = data.gpu?.power_cap_w ?? 0;
-                state.gpuUsagePct = data.gpu?.usage_pct ?? 0;
-                state.gpuVOffsetMv = data.gpu?.v_offset_mv ?? 0;
-                state.room = data.room ?? null;
-                state.ready = true;
             }
         }
-    }
 
+        onExited: (code, status) => {
+            readTimeout.stop();
+            if (code !== 0)
+                state.error = "Readings are temporarily unavailable";
+        }
+        onRunningChanged: {
+            if (running)
+                readTimeout.restart();
+        }
+    }
+    Timer {
+        id: readTimeout
+
+        interval: 5000
+
+        onTriggered: {
+            state.error = "Readings timed out";
+            dataProc.running = false;
+        }
+    }
+    Process {
+        id: actionProc
+
+        onExited: (code, status) => {
+            state.actionError = code === 0 ? "" : "Could not apply the profile. Try again.";
+            root.refresh();
+        }
+    }
     Timer {
         interval: 2000
         repeat: true
-        running: true
-        triggeredOnStart: true
+        running: root.polling
 
-        onTriggered: {
-            if (!dataProc.running)
-                dataProc.running = true;
-        }
+        onTriggered: root.refresh()
+    }
+    Timer {
+        interval: 1000
+        repeat: true
+        running: root.polling
+
+        onTriggered: state.now = Date.now()
     }
 }

@@ -47,7 +47,7 @@ Item {
                 text: qsTr("Ambient"),
                 enabled: true
             },
-            // NaxeCode fork: System tab — pp-* / mon-* control + telemetry from pp-data.
+            // NaxeCode fork: System tab — pp-* / mon-* control + telemetry from pp-status --json.
             {
                 component: systemComponent,
                 iconName: "tune",
@@ -210,7 +210,11 @@ Item {
             Component {
                 id: systemComponent
 
-                SystemTab {}
+                SystemTab {
+                    availableWidth: Math.max(320, root.screenState.modelData.width - Tokens.padding.large * 4 - Config.border.thickness * 2)
+                    availableHeight: Math.max(240, root.screenState.modelData.height - tabs.implicitHeight - Tokens.padding.large * 4 - Config.border.thickness * 2)
+                    polling: root.screenState.dashboard && root.dashboardTabs[root.screenState.dashboardTab]?.component === systemComponent
+                }
             }
 
             // NaxeCode fork
