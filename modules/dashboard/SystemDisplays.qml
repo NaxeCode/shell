@@ -254,7 +254,7 @@ Item {
                     Layout.fillWidth: true
                     color: SysControl.scaleError ? Colours.palette.m3error : Colours.palette.m3onSurfaceVariant
                     font: Tokens.font.body.small
-                    text: SysControl.scaleError || (SysControl.scaleBusy ? qsTr("Applying scale…") : qsTr("All displays · temporary; resets when display settings reload."))
+                    text: SysControl.scaleError || (SysControl.scaleBusy ? qsTr("Applying scale…") : qsTr("All displays · saved across restarts and sign-ins."))
                     wrapMode: Text.WordWrap
                 }
             }

@@ -165,8 +165,10 @@ readings expands sensor and policy details. Displays holds the existing monitor
 layout, brightness, resolution, refresh-rate, VRR and HDR controls. Desktop scale
 uses the existing `hypr-scale-toggle` accessibility helper for all active outputs:
 100%, 125%, 150%, 167% (exact 5/3), and 200%. Invalid steps for the active
-resolutions are disabled. Like the keyboard shortcut, this is temporary zoom;
-the saved layout is restored on a display-settings reload or next login.
+resolutions are disabled. The keyboard shortcut and shell share the same helper,
+which saves scale by display identity and updates the generated layout. Reloads
+and sign-ins restore that choice. Unsupported temporary resolutions use 200%
+without discarding the preferred scale; monitor policy remains in the dotfiles.
 
 The panel is bounded to the available screen space and scrolls on smaller displays.
 Telemetry refreshes every two seconds only while a System tab is open. Missing
