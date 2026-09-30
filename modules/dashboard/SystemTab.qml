@@ -257,24 +257,20 @@ Item {
                         {
                             id: "desk",
                             icon: "dashboard_customize",
-                            label: qsTr("Studio")
-                        },
-                        {
-                            id: "cool-s",
-                            icon: "desktop_windows",
-                            label: qsTr("Desk")
+                            label: qsTr("Both monitors")
                         },
                         {
                             id: "gaming",
-                            icon: "stadia_controller",
-                            label: qsTr("Gaming")
+                            icon: "desktop_windows",
+                            label: qsTr("OLED only")
                         },
                     ]
 
                     delegate: IconTextButton {
                         required property var modelData
 
-                        checked: SysControl.monitorMode === modelData.id
+                        checked: (SysControl.monitorMode === "cool-s" ? "desk" : SysControl.monitorMode) === modelData.id
+                        enabled: !checked
                         horizontalPadding: Tokens.padding.medium
                         icon: modelData.icon
                         text: modelData.label
@@ -283,6 +279,14 @@ Item {
                         onClicked: SysControl.setMonitorMode(modelData.id)
                     }
                 }
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                color: Colours.palette.m3onSurfaceVariant
+                font: Tokens.font.body.small
+                text: qsTr("Changing layout restarts the shell. Save open work first.")
+                wrapMode: Text.WordWrap
             }
         }
 
