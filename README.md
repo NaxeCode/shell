@@ -182,6 +182,34 @@ node tests/power-telemetry.test.mjs
 node tests/display-scale.test.mjs
 ```
 
+### NaxeCode AI capacity drawer
+
+Open the bottom-left usage drawer or call
+`qs -c caelestia ipc call drawers toggle usage`. It reads
+`~/.local/state/ai-usage/usage.json`, refreshed by the dotfiles-owned `ai-usage`
+collector and five-minute `cli-rate-monitor.timer`.
+
+Cards show each reported quota separately: Claude session/all-model/scoped weekly
+limits, ChatGPT's **Codex** quota (not every ChatGPT chat limit), and Grok credits.
+Bars show remaining capacity; the white tick marks modeled remaining capacity at
+the quota boundary. Sparklines show observed usage within the current window,
+with independently scaled vertical axes. Trend arrows compare recent and earlier
+pace; `pp/h` means percentage points of quota consumed per hour.
+
+The graph button expands the sustainable pace, modeled depletion range, observed
+hours/sample count, and evidence caveats. Forecasts begin after six spaced readings
+and 30 observed minutes. They use multiscale rates and 256 recency-weighted block
+scenarios; the 10th–90th percentile range is **not** a calibrated probability.
+Resets, plan/scope changes and counter declines isolate history. Missing intervals
+are not counted as idle, and readings 20 minutes old pause UI forecasts.
+
+Grok's cancelled renewal is noted separately: a quota window end is not proof of
+subscription expiry. Unavailable/authentication responses hide its quota instead
+of inventing remaining capacity or an expiry date. The drawer scrolls when expanded
+details or additional windows exceed the screen height and follows the shell theme.
+Do not restart the shared shell during active assisted work; validate in an isolated
+preview and activate at a safe maintenance boundary when hot reload is disabled.
+
 ### PFP/Wallpapers
 
 The profile picture for the dashboard is read from the file `~/.face`. You can set it by clicking it in the dashboard,

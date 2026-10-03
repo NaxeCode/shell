@@ -22,6 +22,7 @@ CustomMouseArea {
     property bool dashboardShortcutActive
     property bool osdShortcutActive
     property bool utilitiesShortcutActive
+    property bool usageShortcutActive
 
     function withinPanelHeight(panel: Item, x: real, y: real): bool {
         const panelY = root.borderThickness + panel.y;
@@ -78,6 +79,8 @@ CustomMouseArea {
             if (!utilitiesShortcutActive)
                 screenState.utilities = false;
 
+            if (!usageShortcutActive)
+                screenState.usage = false;
             if (!popouts.currentName.startsWith("traymenu") || ((popouts.current as StackView)?.depth ?? 0) <= 1) {
                 popouts.hasCurrent = false;
                 bar.closeTray();
@@ -226,7 +229,6 @@ CustomMouseArea {
                 screenState.dashboard = false;
         }
 
-        // Show utilities on hover
         const showUtilities = inBottomPanel(panels.utilities, x, y, true);
 
         // Always update visibility based on hover if not in shortcut mode
@@ -237,6 +239,19 @@ CustomMouseArea {
             utilitiesShortcutActive = false;
         }
 
+        // Bottom-left sibling of utilities. Launcher owns the bottom center.
+        const showUsage = inBottomPanel(panels.usage, x, y, true);
+        if (!usageShortcutActive)
+            screenState.usage = showUsage;
+        else if (showUsage)
+            usageShortcutActive = false;
+
+        if (pressed && inBottomPanel(panels.usage, dragStart.x, dragStart.y, true) && withinPanelWidth(panels.usage, x, y)) {
+            if (dragY < -Config.launcher.dragThreshold)
+                screenState.usage = true;
+            else if (dragY > Config.launcher.dragThreshold)
+                screenState.usage = false;
+        }
         // Show popouts on hover
         if (x < bar.implicitWidth) {
             bar.checkPopout(y);
@@ -305,6 +320,16 @@ CustomMouseArea {
             } else {
                 // Utilities hidden, clear shortcut flag
                 root.utilitiesShortcutActive = false;
+            }
+        }
+
+        function onUsageChanged() {
+            if (root.screenState.usage) {
+                const inUsageArea = root.inBottomPanel(root.panels.usage, root.mouseX, root.mouseY, true);
+                if (!inUsageArea)
+                    root.usageShortcutActive = true;
+            } else {
+                root.usageShortcutActive = false;
             }
         }
 

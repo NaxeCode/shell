@@ -43,7 +43,7 @@ StyledWindow {
     readonly property real borderRounding: oledBlackout ? 0 : contentItem.Config.border.rounding * (1 - fsTransitionProg)
     readonly property real shadowOpacity: oledBlackout ? 0 : 0.7 * (1 - fsTransitionProg)
     readonly property real borderLayoutThickness: (hasFullscreen || oledBlackout) ? 0 : contentItem.Config.border.thickness
-    readonly property bool hasVisibleDrawerPaint: panels.dashboard.visible || panels.launcher.visible || panels.session.visible || panels.sidebar.visible || panels.osd.visible || panels.utilities.visible
+    readonly property bool hasVisibleDrawerPaint: panels.dashboard.visible || panels.launcher.visible || panels.session.visible || panels.sidebar.visible || panels.osd.visible || panels.utilities.visible || panels.usage.visible
 
     property color surfaceColour: Colours.tPalette.m3surface
 
@@ -66,6 +66,7 @@ StyledWindow {
         screenState.session = false;
         screenState.dashboard = false;
         panels.popouts.close();
+        screenState.usage = false;
     }
 
     name: "drawers"
@@ -196,6 +197,13 @@ StyledWindow {
         }
 
         PanelBg {
+            id: usageBg
+
+            panel: panels.usage
+            deformAmount: 0.12
+        }
+
+        PanelBg {
             id: sessionBg
 
             panel: panels.sessionWrapper
@@ -297,6 +305,9 @@ StyledWindow {
             }
             utilities.transform: Matrix4x4 {
                 matrix: utilsBg.deformMatrix
+            }
+            usage.transform: Matrix4x4 {
+                matrix: usageBg.deformMatrix
             }
             popouts.transform: Matrix4x4 {
                 matrix: popoutBg.deformMatrix

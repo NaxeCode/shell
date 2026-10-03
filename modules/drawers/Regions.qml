@@ -69,6 +69,12 @@ Region {
     }
 
     R {
+        panel: root.panels.usage
+        y: root.win.height - height
+        height: panel.height * (1 - root.panels.usage.offsetScale) + ((!root.oledBlackout || root.panels.usage.offsetScale < 0.99) ? root.borderThickness : 0)
+    }
+
+    R {
         panel: root.panels.popoutsWrapper
         width: panel.width * (1 - root.panels.popoutsWrapper.offsetScale)
     }
