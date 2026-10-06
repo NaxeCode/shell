@@ -40,6 +40,11 @@ QtObject {
     property list<var> actions
 
     readonly property bool hasFullscreen: {
+        // Only popups use this. Returning early drops the Hyprland dependencies,
+        // so history entries don't re-evaluate on every focus or workspace change.
+        if (!notif.popup)
+            return false;
+
         const monitor = Hypr.focusedMonitor;
         const specialName = monitor?.lastIpcObject.specialWorkspace?.name;
         if (specialName) {
