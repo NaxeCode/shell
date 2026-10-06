@@ -21,12 +21,39 @@ Singleton {
 
     property bool loaded
 
+    // History beyond this is dropped, newest kept. Every entry is a live
+    // object with bindings, so an unbounded list slows startup and grows memory.
+    readonly property int maxHistory: 300
+
     function hasFullscreen(): bool {
         for (const monitor of Hypr.monitors.values) {
             if (monitor?.activeWorkspace?.toplevels.values.some(t => t.lastIpcObject.fullscreen > 1))
                 return true;
         }
         return false;
+    }
+
+    function trimHistory(): void {
+        if (list.length <= maxHistory)
+            return;
+
+        // The list is newest first. Entries still on screen or animating stay.
+        const kept = [];
+        const dropped = [];
+        for (const n of list) {
+            if (kept.length < maxHistory || n.popup || n.locks.size > 0)
+                kept.push(n);
+            else
+                dropped.push(n);
+        }
+        if (dropped.length === 0)
+            return;
+
+        list = kept;
+        for (const n of dropped) {
+            n.notification?.dismiss();
+            n.destroy();
+        }
     }
 
     function shouldShowPopup(): bool {
@@ -99,6 +126,7 @@ Singleton {
                 notification: notif
             });
             root.list = [comp, ...root.list];
+            root.trimHistory();
         }
     }
 
@@ -109,7 +137,12 @@ Singleton {
         path: `${Paths.state}/notifs.json`
         onLoaded: {
             const data = JSON.parse(text());
-            for (const notif of data) {
+            data.sort((a, b) => (Date.parse(b.time) || 0) - (Date.parse(a.time) || 0));
+
+            // Build in a plain array and assign once: pushing into the list
+            // property re-evaluates notClosed/popups per item, which is O(n^2).
+            const restored = [];
+            for (const notif of data.slice(0, root.maxHistory)) {
                 const properties = Object.assign({}, notif);
 
                 // Backwards compatibility for old notifications
@@ -117,10 +150,13 @@ Singleton {
                     properties.notificationId = properties.id;
 
                 delete properties.id;
-                root.list.push(notifComp.createObject(root, properties));
+                restored.push(notifComp.createObject(root, properties));
             }
-            root.list.sort((a, b) => b.time - a.time);
+            root.list = [...root.list, ...restored].sort((a, b) => b.time - a.time);
+            root.trimHistory();
             root.loaded = true;
+            if (data.length > root.maxHistory)
+                saveTimer.restart();
         }
         onLoadFailed: err => {
             if (err === FileViewError.FileNotFound) {
