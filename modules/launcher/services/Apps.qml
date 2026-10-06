@@ -11,13 +11,19 @@ Searcher {
     function launch(entry: DesktopEntry): void {
         appDb.incrementFrequency(entry.id);
 
+        // app2unit starts each app in its own systemd scope. As plain children
+        // of the shell, apps shared its cgroup: restarting the shell killed
+        // them, and oomd counted their memory against the shell.
         if (entry.runInTerminal)
             Quickshell.execDetached({
-                command: [...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, ...entry.command],
+                command: ["app2unit", "--", ...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, ...entry.command],
                 workingDirectory: entry.workingDirectory
             });
         else
-            entry.execute();
+            Quickshell.execDetached({
+                command: ["app2unit", "--", `${entry.id}.desktop`],
+                workingDirectory: entry.workingDirectory
+            });
     }
 
     function search(search: string): var {
